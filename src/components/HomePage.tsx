@@ -26,6 +26,7 @@ interface HomePageProps {
   onDeleteDocument: (id: string) => void;
   onRenameDocument: (id: string, newTitle: string) => void;
   onOpenSettings: () => void;
+  onOpenPdfImport: () => void;
 }
 
 export const HomePage: React.FC<HomePageProps> = ({
@@ -37,6 +38,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   onDeleteDocument,
   onRenameDocument,
   onOpenSettings,
+  onOpenPdfImport,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'pitch-deck' | 'brochure' | 'one-pager' | 'flyer'>('all');
@@ -108,6 +110,15 @@ export const HomePage: React.FC<HomePageProps> = ({
         {/* Right Actions */}
         <div className="flex items-center gap-2.5">
           <button
+            onClick={onOpenPdfImport}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-pink-500/15 border border-pink-500/30 hover:bg-pink-500/25 text-pink-200 font-semibold text-xs transition-all"
+            title="Import any PDF to edit all elements"
+          >
+            <FileText className="w-3.5 h-3.5 text-pink-400" />
+            <span className="hidden sm:inline">Import PDF</span>
+          </button>
+
+          <button
             onClick={onCreateNewWithAi}
             className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs transition-all shadow-gamma-glow hover:scale-[1.02] active:scale-[0.98]"
           >
@@ -133,70 +144,98 @@ export const HomePage: React.FC<HomePageProps> = ({
             What would you like to create today?
           </h1>
           <p className="text-sm sm:text-base text-neutral-400 leading-relaxed">
-            Generate executive pitch decks, luxury brochures, and visual presentations powered directly by Claude 3.7 / 3.5 Sonnet.
+            Generate executive pitch decks, import and edit any PDF, and collaborate live in real time.
           </p>
         </div>
 
-        {/* 3 HERO CREATION ACTION CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {/* 4 HERO CREATION ACTION CARDS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Card 1: Generate with AI */}
           <div
             onClick={onCreateNewWithAi}
-            className="group relative p-6 rounded-3xl bg-gradient-to-b from-[#1C182E] to-[#12131F] border border-purple-500/30 hover:border-purple-500/60 transition-all duration-200 cursor-pointer shadow-lg hover:shadow-gamma-glow hover:-translate-y-1"
+            className="group relative p-5 rounded-3xl bg-gradient-to-b from-[#1C182E] to-[#12131F] border border-purple-500/30 hover:border-purple-500/60 transition-all duration-200 cursor-pointer shadow-lg hover:shadow-gamma-glow hover:-translate-y-1 flex flex-col justify-between"
           >
-            <div className="w-12 h-12 rounded-2xl bg-purple-600/30 text-purple-300 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
-              <Sparkles className="w-6 h-6" />
+            <div>
+              <div className="w-10 h-10 rounded-2xl bg-purple-600/30 text-purple-300 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div className="inline-block px-2 py-0.5 rounded-full text-[9px] font-mono bg-purple-500/20 text-purple-300 font-semibold uppercase tracking-wider mb-2">
+                RECOMMENDED
+              </div>
+              <h3 className="text-base font-bold text-white mb-1 flex items-center justify-between">
+                <span>Generate with AI</span>
+                <ArrowRight className="w-4 h-4 text-purple-400 group-hover:translate-x-1 transition-transform" />
+              </h3>
+              <p className="text-xs text-neutral-400 leading-relaxed">
+                Provide a prompt or topic. Claude designs structured, visual presentation cards.
+              </p>
             </div>
-            <div className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/20 text-purple-300 font-semibold uppercase tracking-wider mb-2">
-              RECOMMENDED
-            </div>
-            <h3 className="text-lg font-bold text-white mb-1.5 flex items-center justify-between">
-              <span>Generate with AI</span>
-              <ArrowRight className="w-4 h-4 text-purple-400 group-hover:translate-x-1 transition-transform" />
-            </h3>
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              Start with a brief or topic. Claude writes copy, structures slides, and crafts beautiful cards instantly.
-            </p>
           </div>
 
-          {/* Card 2: Paste in Text */}
+          {/* Card 2: Import & Edit PDF */}
+          <div
+            onClick={onOpenPdfImport}
+            className="group relative p-5 rounded-3xl bg-gradient-to-b from-[#2B1425] to-[#15111B] border border-pink-500/30 hover:border-pink-500/60 transition-all duration-200 cursor-pointer shadow-lg hover:-translate-y-1 flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-10 h-10 rounded-2xl bg-pink-500/20 text-pink-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div className="inline-block px-2 py-0.5 rounded-full text-[9px] font-mono bg-pink-500/20 text-pink-300 font-semibold uppercase tracking-wider mb-2">
+                CANVA PARSER
+              </div>
+              <h3 className="text-base font-bold text-white mb-1 flex items-center justify-between">
+                <span>Import & Edit PDF</span>
+                <ArrowRight className="w-4 h-4 text-pink-400 group-hover:translate-x-1 transition-transform" />
+              </h3>
+              <p className="text-xs text-neutral-400 leading-relaxed">
+                Upload any PDF. Every heading, stat, bullet point, and card becomes 100% editable.
+              </p>
+            </div>
+          </div>
+
+          {/* Card 3: Paste in Text */}
           <div
             onClick={onCreateNewWithAi}
-            className="group relative p-6 rounded-3xl bg-[#141522] border border-white/10 hover:border-cyan-500/50 transition-all duration-200 cursor-pointer shadow-lg hover:-translate-y-1"
+            className="group relative p-5 rounded-3xl bg-[#141522] border border-white/10 hover:border-cyan-500/50 transition-all duration-200 cursor-pointer shadow-lg hover:-translate-y-1 flex flex-col justify-between"
           >
-            <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
-              <FileText className="w-6 h-6" />
+            <div>
+              <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div className="inline-block px-2 py-0.5 rounded-full text-[9px] font-mono bg-cyan-500/20 text-cyan-300 font-semibold uppercase tracking-wider mb-2">
+                TEXT TO DECK
+              </div>
+              <h3 className="text-base font-bold text-white mb-1 flex items-center justify-between">
+                <span>Paste Notes</span>
+                <ArrowRight className="w-4 h-4 text-cyan-400 group-hover:translate-x-1 transition-transform" />
+              </h3>
+              <p className="text-xs text-neutral-400 leading-relaxed">
+                Transform rough outlines, meeting notes, or briefs into visual cards.
+              </p>
             </div>
-            <div className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/20 text-cyan-300 font-semibold uppercase tracking-wider mb-2">
-              FAST CONVERSION
-            </div>
-            <h3 className="text-lg font-bold text-white mb-1.5 flex items-center justify-between">
-              <span>Paste in Text or Notes</span>
-              <ArrowRight className="w-4 h-4 text-cyan-400 group-hover:translate-x-1 transition-transform" />
-            </h3>
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              Transform meeting notes, executive summaries, or product briefs into polished presentation cards.
-            </p>
           </div>
 
-          {/* Card 3: Blank Deck */}
+          {/* Card 4: Blank Deck */}
           <div
             onClick={() => onCreateBlank('pitch-deck')}
-            className="group relative p-6 rounded-3xl bg-[#141522] border border-white/10 hover:border-emerald-500/50 transition-all duration-200 cursor-pointer shadow-lg hover:-translate-y-1"
+            className="group relative p-5 rounded-3xl bg-[#141522] border border-white/10 hover:border-emerald-500/50 transition-all duration-200 cursor-pointer shadow-lg hover:-translate-y-1 flex flex-col justify-between"
           >
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
-              <Plus className="w-6 h-6" />
+            <div>
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <Plus className="w-5 h-5" />
+              </div>
+              <div className="inline-block px-2 py-0.5 rounded-full text-[9px] font-mono bg-emerald-500/20 text-emerald-300 font-semibold uppercase tracking-wider mb-2">
+                BLANK CANVAS
+              </div>
+              <h3 className="text-base font-bold text-white mb-1 flex items-center justify-between">
+                <span>Blank Canvas</span>
+                <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-1 transition-transform" />
+              </h3>
+              <p className="text-xs text-neutral-400 leading-relaxed">
+                Start fresh and build your deck card-by-card using the Canva Elements drawer.
+              </p>
             </div>
-            <div className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/20 text-emerald-300 font-semibold uppercase tracking-wider mb-2">
-              CUSTOM CANVAS
-            </div>
-            <h3 className="text-lg font-bold text-white mb-1.5 flex items-center justify-between">
-              <span>Blank Canvas</span>
-              <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-1 transition-transform" />
-            </h3>
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              Start with an empty canvas and build your deck card-by-card with our interactive Canva-style tools.
-            </p>
           </div>
         </div>
 

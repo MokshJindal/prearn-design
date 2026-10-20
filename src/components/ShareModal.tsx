@@ -12,7 +12,9 @@ import {
   Mail, 
   MessageSquare,
   Sparkles,
-  ChevronDown
+  ChevronDown,
+  Edit3,
+  Eye
 } from 'lucide-react';
 import { Collaborator } from '../types/design';
 
@@ -38,19 +40,23 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   onShowToast,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [copiedRole, setCopiedRole] = useState<'editor' | 'viewer'>('editor');
+  const [shareRole, setShareRole] = useState<'editor' | 'viewer'>('editor');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
   const [inviteRole, setInviteRole] = useState<'editor' | 'commenter' | 'viewer'>('editor');
-  const [accessLevel, setAccessLevel] = useState<'public' | 'restricted'>('public');
 
   if (!isOpen) return null;
 
-  const shareUrl = `${window.location.origin}/?project=${documentId}`;
+  // Real-time room link with explicit role parameter
+  const shareUrl = `${window.location.origin}/?room=${encodeURIComponent(documentId)}&role=${shareRole}`;
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(shareUrl);
+  const handleCopyLink = (roleToCopy: 'editor' | 'viewer' = shareRole) => {
+    const url = `${window.location.origin}/?room=${encodeURIComponent(documentId)}&role=${roleToCopy}`;
+    navigator.clipboard.writeText(url);
     setCopied(true);
-    onShowToast('Shareable collaboration link copied to clipboard!');
+    setCopiedRole(roleToCopy);
+    onShowToast(`Copied real-time ${roleToCopy.toUpperCase()} link! Teammates can now join.`);
     setTimeout(() => setCopied(false), 2500);
   };
 
@@ -58,7 +64,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     e.preventDefault();
     if (!inviteEmail.trim()) return;
 
-    const colors = ['#8B5CF6', '#06B6D4', '#10B981', '#F59E0B', '#EC4899', '#3B82F6'];
+    const colors = ['#8B5CF6', '#06B6D4', '#10B981', '#F59E0B', '#EC4899', '#3B82F6', '#EF4444', '#14B8A6'];
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
     const displayName = inviteName.trim() || inviteEmail.split('@')[0];
 
@@ -88,13 +94,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <span>Share & Collaborate</span>
+                <span>Canva-Grade Real-Time Collaboration</span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/20 text-purple-300 font-semibold border border-purple-500/30">
-                  LIVE SYNC
+                  P2P LIVE SYNC
                 </span>
               </h2>
               <p className="text-xs text-neutral-400 truncate max-w-xs sm:max-w-sm">
-                Invite team members to view, edit, or comment on <span className="text-white font-medium">"{documentTitle}"</span>
+                Share <span className="text-white font-medium">"{documentTitle}"</span> with teammates to edit every element live.
               </p>
             </div>
           </div>
@@ -109,34 +115,37 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         {/* Body */}
         <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto text-xs">
           {/* Quick Share Link Box */}
-          <div className="p-4 rounded-2xl bg-[#090A10] border border-white/10">
-            <div className="flex items-center justify-between mb-2">
+          <div className="p-4 rounded-2xl bg-[#090A10] border border-white/10 space-y-3">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-white font-bold text-xs">
                 <Globe className="w-4 h-4 text-purple-400" />
-                <span>General Access</span>
+                <span>Collaboration Link</span>
               </div>
-              <select
-                value={accessLevel}
-                onChange={(e) => setAccessLevel(e.target.value as any)}
-                className="bg-[#181926] border border-white/10 rounded-lg px-2 py-1 text-[11px] text-neutral-300 focus:outline-none focus:border-purple-500"
-              >
-                <option value="public">Anyone with link can view</option>
-                <option value="restricted">Restricted to invited team</option>
-              </select>
+              <div className="flex items-center gap-1.5">
+                <span className="text-neutral-400 text-[11px]">Permission:</span>
+                <select
+                  value={shareRole}
+                  onChange={(e) => setShareRole(e.target.value as any)}
+                  className="bg-[#181926] border border-white/15 rounded-lg px-2.5 py-1 text-[11px] text-white font-medium focus:outline-none focus:border-purple-500 cursor-pointer"
+                >
+                  <option value="editor">Can edit (Real-time)</option>
+                  <option value="viewer">Can view only</option>
+                </select>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 mt-3">
+            <div className="flex items-center gap-2">
               <div className="flex-1 bg-[#151624] border border-white/10 rounded-xl px-3 py-2 text-[11px] text-neutral-400 font-mono truncate select-all">
                 {shareUrl}
               </div>
               <button
-                onClick={handleCopyLink}
+                onClick={() => handleCopyLink(shareRole)}
                 className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-gamma-glow flex-shrink-0"
               >
                 {copied ? (
                   <>
                     <Check className="w-3.5 h-3.5 text-emerald-300" />
-                    <span>Copied</span>
+                    <span>Copied!</span>
                   </>
                 ) : (
                   <>
@@ -146,13 +155,62 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                 )}
               </button>
             </div>
+
+            {/* Quick Helper Banner */}
+            <div className="p-2.5 rounded-xl bg-purple-600/10 border border-purple-500/20 text-[11px] text-purple-200 flex items-start gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-purple-400 flex-shrink-0 mt-0.5" />
+              <span>
+                {shareRole === 'editor'
+                  ? 'Anyone with this Editor link can open it in any browser or tab and edit text, cards, stats, and layouts simultaneously.'
+                  : 'Anyone with this Viewer link can observe live updates in real time in read-only mode.'}
+              </span>
+            </div>
+          </div>
+
+          {/* Quick Dual Link Action Buttons */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => handleCopyLink('editor')}
+              className="p-3 rounded-2xl bg-[#0E0F17] hover:bg-white/5 border border-white/10 text-left transition-all group flex items-center justify-between"
+            >
+              <div>
+                <div className="font-bold text-white flex items-center gap-1.5">
+                  <Edit3 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Copy Editor Link</span>
+                </div>
+                <div className="text-[10px] text-neutral-400">Full live editing rights</div>
+              </div>
+              {copied && copiedRole === 'editor' ? (
+                <Check className="w-4 h-4 text-emerald-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-neutral-500 group-hover:text-white" />
+              )}
+            </button>
+
+            <button
+              onClick={() => handleCopyLink('viewer')}
+              className="p-3 rounded-2xl bg-[#0E0F17] hover:bg-white/5 border border-white/10 text-left transition-all group flex items-center justify-between"
+            >
+              <div>
+                <div className="font-bold text-white flex items-center gap-1.5">
+                  <Eye className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Copy Viewer Link</span>
+                </div>
+                <div className="text-[10px] text-neutral-400">Read-only live presentation</div>
+              </div>
+              {copied && copiedRole === 'viewer' ? (
+                <Check className="w-4 h-4 text-emerald-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-neutral-500 group-hover:text-white" />
+              )}
+            </button>
           </div>
 
           {/* Invite Collaborator Form */}
           <div>
             <label className="text-xs font-semibold text-neutral-300 block mb-2 uppercase tracking-wider font-mono flex items-center gap-1.5">
               <UserPlus className="w-3.5 h-3.5 text-purple-400" />
-              <span>Invite People & Teammates</span>
+              <span>Invite Teammates</span>
             </label>
             <form onSubmit={handleInvite} className="flex flex-col sm:flex-row gap-2">
               <input
@@ -176,14 +234,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                 className="bg-[#181926] border border-white/10 rounded-xl px-3 py-2 text-xs text-neutral-300 focus:outline-none focus:border-purple-500 flex-shrink-0"
               >
                 <option value="editor">Can edit</option>
-                <option value="commenter">Can comment</option>
                 <option value="viewer">Can view</option>
               </select>
               <button
                 type="submit"
                 className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs transition-colors flex-shrink-0"
               >
-                Send Invite
+                Add
               </button>
             </form>
           </div>
@@ -192,11 +249,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           <div>
             <div className="flex items-center justify-between mb-2.5">
               <span className="text-[11px] font-mono uppercase text-neutral-400 font-semibold">
-                Who has access ({collaborators.length})
+                Active in Room ({collaborators.length})
               </span>
               <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Live Multi-User Sync
+                Live Sync Active
               </span>
             </div>
 
@@ -221,8 +278,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                             OWNER
                           </span>
                         )}
+                        {c.role === 'editor' && (
+                          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
+                            EDITOR
+                          </span>
+                        )}
                       </div>
-                      <div className="text-[11px] text-neutral-400 font-mono">{c.email}</div>
+                      <div className="text-[11px] text-neutral-400 font-mono">{c.email || c.lastSeen}</div>
                     </div>
                   </div>
 
@@ -250,7 +312,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         <div className="px-6 py-4 border-t border-white/10 bg-[#151724] flex items-center justify-between">
           <div className="text-[11px] text-neutral-400 flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
-            <span>End-to-end encrypted live workspace</span>
+            <span>Encrypted WebRTC & Cloud Edge synchronization</span>
           </div>
           <button
             onClick={onClose}

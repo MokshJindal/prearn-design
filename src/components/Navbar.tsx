@@ -10,7 +10,9 @@ import {
   Crown,
   Wand2,
   Check,
-  Users
+  Users,
+  FileText,
+  Eye
 } from 'lucide-react';
 import { DesignDocument, DocumentType, Collaborator } from '../types/design';
 import { THEMES } from '../services/themes';
@@ -27,7 +29,9 @@ interface NavbarProps {
   onOpenSettingsModal: () => void;
   onOpenShareModal: () => void;
   onBackToHome: () => void;
+  onOpenPdfImport?: () => void;
   collaborators?: Collaborator[];
+  role?: Collaborator['role'];
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -40,7 +44,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSettingsModal,
   onOpenShareModal,
   onBackToHome,
+  onOpenPdfImport,
   collaborators = [],
+  role = 'editor',
 }) => {
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showTypeMenu, setShowTypeMenu] = useState(false);
@@ -223,6 +229,19 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Right: Presence, Share, Presentation, Export, Settings */}
       <div className="flex items-center gap-2">
+        {/* Role Pill */}
+        {role === 'viewer' ? (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-300 font-mono text-[11px] font-bold">
+            <Eye className="w-3 h-3 text-blue-400" />
+            <span>VIEW ONLY</span>
+          </div>
+        ) : (
+          <span className="hidden lg:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono text-[10px] font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            CAN EDIT
+          </span>
+        )}
+
         {/* Collaborators Avatar Stack */}
         {collaborators.length > 0 && (
           <div className="flex items-center -space-x-1.5 mr-1 hidden sm:flex">
@@ -241,6 +260,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             ))}
           </div>
+        )}
+
+        {/* Import PDF Button */}
+        {onOpenPdfImport && (
+          <button
+            onClick={onOpenPdfImport}
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-pink-500/15 hover:bg-pink-500/25 border border-pink-500/30 text-pink-200 font-medium text-xs transition-all"
+            title="Import any PDF and convert into editable presentation"
+          >
+            <FileText className="w-3.5 h-3.5 text-pink-400" />
+            <span className="hidden md:inline">Import PDF</span>
+          </button>
         )}
 
         {/* Canva-Grade Share Button */}

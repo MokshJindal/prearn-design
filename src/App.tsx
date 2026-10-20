@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   DesignDocument, 
   SlidePage, 
@@ -13,6 +13,7 @@ import { storageService } from './services/storage';
 import { STARTER_PITCH_DECK } from './services/templates';
 import { getTheme } from './services/themes';
 import { generateNextSlideInDeck } from './services/claude';
+import { RealtimeCollabSession, getLocalCollaborator } from './services/collaboration';
 import { HomePage } from './components/HomePage';
 import { Navbar } from './components/Navbar';
 import { GammaCard } from './components/GammaCard';
@@ -25,12 +26,13 @@ import { PresentationModal } from './components/PresentationModal';
 import { ExportModal } from './components/ExportModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ShareModal } from './components/ShareModal';
+import { PdfImportModal } from './components/PdfImportModal';
 import { CommentsDrawer } from './components/CommentsDrawer';
 import { CanvaElementsDrawer } from './components/CanvaElementsDrawer';
 import { CanvaFormattingBar } from './components/CanvaFormattingBar';
 import { VersionHistoryModal } from './components/VersionHistoryModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 
 export function App() {
   const [currentView, setCurrentView] = useState<'home' | 'editor'>('home');
@@ -56,43 +58,32 @@ export function App() {
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isPdfImportOpen, setIsPdfImportOpen] = useState(false);
   const [isCommentsDrawerOpen, setIsCommentsDrawerOpen] = useState(false);
   const [isElementsDrawerOpen, setIsElementsDrawerOpen] = useState(false);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
   const [isAiAddingNext, setIsAiAddingNext] = useState(false);
 
   // Collaboration State
+  const [collabRole, setCollabRole] = useState<Collaborator['role']>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const r = params.get('role');
+      if (r === 'viewer' || r === 'editor' || r === 'commenter' || r === 'owner') return r;
+    } catch (e) {}
+    return 'editor';
+  });
+  const [remoteSelections, setRemoteSelections] = useState<Record<string, { colId: string; colName: string; colColor: string }>>({});
+  const collabSessionRef = useRef<RealtimeCollabSession | null>(null);
+  const isRemoteUpdatingRef = useRef<boolean>(false);
+  const currentDocRef = useRef(currentDoc);
+
+  useEffect(() => {
+    currentDocRef.current = currentDoc;
+  }, [currentDoc]);
+
   const [collaborators, setCollaborators] = useState<Collaborator[]>([
-    {
-      id: 'col-1',
-      name: 'Moksh Jindal',
-      email: 'jindalmoksh2008@gmail.com',
-      avatar: 'M',
-      role: 'owner',
-      color: '#8B5CF6',
-      status: 'active',
-      lastSeen: 'Now',
-    },
-    {
-      id: 'col-2',
-      name: 'Elena Rostova',
-      email: 'elena@deepmind.com',
-      avatar: 'E',
-      role: 'editor',
-      color: '#06B6D4',
-      status: 'active',
-      lastSeen: 'Viewing Slide 2',
-    },
-    {
-      id: 'col-3',
-      name: 'Alex Rivera',
-      email: 'alex@sequoia.com',
-      avatar: 'A',
-      role: 'commenter',
-      color: '#10B981',
-      status: 'idle',
-      lastSeen: '8 mins ago',
-    },
+    getLocalCollaborator(collabRole),
   ]);
 
   // Real-time Comments State
@@ -163,10 +154,107 @@ export function App() {
     setHistoryIndex(newHistory.length);
     setCurrentDoc(newDoc);
 
-    // Save to storage
+    // Save to local storage
     storageService.save(newDoc);
     setDocuments(storageService.loadAll());
+
+    // Broadcast to live collaborators in real-time
+    if (!isRemoteUpdatingRef.current && collabRole !== 'viewer' && collabSessionRef.current) {
+      collabSessionRef.current.broadcastDocUpdate(newDoc);
+    }
   };
+
+  // Sync with URL Room ID on mount
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const roomId = params.get('room') || params.get('project');
+      const roleParam = params.get('role') as Collaborator['role'];
+      if (roleParam) {
+        setCollabRole(roleParam);
+      }
+
+      if (roomId) {
+        const all = storageService.loadAll();
+        const existing = all.find(d => d.id === roomId);
+        if (existing) {
+          handleOpenDocument(existing);
+        } else {
+          // Fetch from Edge Room API
+          fetch(`/api/room?id=${encodeURIComponent(roomId)}`)
+            .then(res => res.json())
+            .then(data => {
+              if (data.success && data.doc) {
+                storageService.save(data.doc);
+                setDocuments(storageService.loadAll());
+                handleOpenDocument(data.doc);
+                addToast({
+                  title: `Joined room "${data.doc.title}" as ${roleParam || 'editor'}!`,
+                  type: 'success',
+                });
+              }
+            })
+            .catch(() => {});
+        }
+      }
+    } catch (e) {}
+  }, []);
+
+  // Initialize Real-time Collab Session
+  useEffect(() => {
+    if (!currentDoc?.id) return;
+
+    const session = new RealtimeCollabSession(
+      currentDoc.id,
+      collabRole,
+      () => currentDocRef.current,
+      (remoteDoc, sender) => {
+        isRemoteUpdatingRef.current = true;
+        setCurrentDoc(remoteDoc);
+        storageService.save(remoteDoc);
+        setDocuments(storageService.loadAll());
+        setTimeout(() => {
+          isRemoteUpdatingRef.current = false;
+        }, 150);
+      },
+      (activeCollaborators) => {
+        setCollaborators(activeCollaborators);
+      },
+      (colId, elementId, colName, colColor) => {
+        setRemoteSelections(prev => {
+          const next = { ...prev };
+          Object.keys(next).forEach(key => {
+            if (next[key].colId === colId) delete next[key];
+          });
+          if (elementId) {
+            next[elementId] = { colId, colName, colColor };
+          }
+          return next;
+        });
+      }
+    );
+
+    collabSessionRef.current = session;
+
+    return () => {
+      session.disconnect();
+      collabSessionRef.current = null;
+    };
+  }, [currentDoc?.id, collabRole]);
+
+  // Broadcast element selection to collaborators
+  useEffect(() => {
+    if (collabSessionRef.current) {
+      collabSessionRef.current.broadcastSelection(selectedElementId);
+    }
+  }, [selectedElementId]);
+
+  // Broadcast slide change to collaborators
+  useEffect(() => {
+    if (collabSessionRef.current) {
+      collabSessionRef.current.broadcastSlideChange(activeSlideIndex);
+    }
+  }, [activeSlideIndex]);
 
   const handleOpenDocument = (doc: DesignDocument) => {
     setCurrentDoc(doc);
@@ -758,6 +846,7 @@ export function App() {
           onDeleteDocument={handleDeleteDocument}
           onRenameDocument={handleRenameDocument}
           onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenPdfImport={() => setIsPdfImportOpen(true)}
         />
       ) : (
         <div className="h-screen w-screen flex flex-col gamma-mesh-bg text-neutral-100 overflow-hidden font-sans">
@@ -778,8 +867,18 @@ export function App() {
             onOpenSettingsModal={() => setIsSettingsOpen(true)}
             onOpenShareModal={() => setIsShareModalOpen(true)}
             onBackToHome={() => setCurrentView('home')}
+            onOpenPdfImport={() => setIsPdfImportOpen(true)}
             collaborators={collaborators}
+            role={collabRole}
           />
+
+          {/* Read-Only Viewer Notice Bar */}
+          {collabRole === 'viewer' && (
+            <div className="bg-blue-600/20 border-b border-blue-500/30 px-4 py-1.5 text-center text-xs text-blue-200 flex items-center justify-center gap-2">
+              <Eye className="w-3.5 h-3.5 text-blue-400" />
+              <span>Viewing in Real-Time Mode • Live updates from editors will appear automatically</span>
+            </div>
+          )}
 
           <div className="flex-1 flex overflow-hidden relative">
             {!isBrochure && (
@@ -895,13 +994,15 @@ export function App() {
                       onUpdateSlide={handleUpdateCurrentSlide}
                       selectedElementId={selectedElementId}
                       onSelectElement={setSelectedElementId}
+                      remoteSelections={remoteSelections}
+                      isReadOnly={collabRole === 'viewer'}
                     />
                   </div>
                 )}
               </div>
             </div>
 
-            {selectedElement && (
+            {selectedElement && collabRole !== 'viewer' && (
               <SelectionBubble
                 selectedElement={selectedElement}
                 onUpdateElement={handleUpdateElement}
@@ -912,21 +1013,23 @@ export function App() {
               />
             )}
 
-            <FloatingAiBar
-              currentDocument={currentDoc}
-              currentSlide={currentSlide}
-              onReplaceDocument={(newDoc) => {
-                pushDocState(newDoc);
-                setActiveSlideIndex(0);
-              }}
-              onUpdateSlide={handleUpdateCurrentSlide}
-              onAddGeneratedSlide={(newSlide) => {
-                const newSlides = [...currentDoc.slides, newSlide];
-                pushDocState({ ...currentDoc, slides: newSlides });
-                setActiveSlideIndex(newSlides.length - 1);
-              }}
-              activeThemeId={currentDoc.themeId}
-            />
+            {collabRole !== 'viewer' && (
+              <FloatingAiBar
+                currentDocument={currentDoc}
+                currentSlide={currentSlide}
+                onReplaceDocument={(newDoc) => {
+                  pushDocState(newDoc);
+                  setActiveSlideIndex(0);
+                }}
+                onUpdateSlide={handleUpdateCurrentSlide}
+                onAddGeneratedSlide={(newSlide) => {
+                  const newSlides = [...currentDoc.slides, newSlide];
+                  pushDocState({ ...currentDoc, slides: newSlides });
+                  setActiveSlideIndex(newSlides.length - 1);
+                }}
+                activeThemeId={currentDoc.themeId}
+              />
+            )}
 
             {/* Canva Elements Left Drawer */}
             <CanvaElementsDrawer
@@ -997,6 +1100,18 @@ export function App() {
         collaborators={collaborators}
         onAddCollaborator={handleAddCollaborator}
         onRemoveCollaborator={handleRemoveCollaborator}
+        onShowToast={(msg) => addToast({ title: msg, type: 'success' })}
+      />
+
+      {/* PDF Import Modal */}
+      <PdfImportModal
+        isOpen={isPdfImportOpen}
+        onClose={() => setIsPdfImportOpen(false)}
+        onImportComplete={(newDoc) => {
+          storageService.save(newDoc);
+          setDocuments(storageService.loadAll());
+          handleOpenDocument(newDoc);
+        }}
         onShowToast={(msg) => addToast({ title: msg, type: 'success' })}
       />
 

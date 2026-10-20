@@ -15,6 +15,12 @@ import {
   Wand2
 } from 'lucide-react';
 
+interface RemoteSelectionInfo {
+  colId: string;
+  colName: string;
+  colColor: string;
+}
+
 interface GammaCardProps {
   slide: SlidePage;
   theme: ThemeColors;
@@ -24,6 +30,8 @@ interface GammaCardProps {
   onSelectElement: (id: string | null) => void;
   isPresentationMode?: boolean;
   onQuickAiAction?: (action: string) => void;
+  remoteSelections?: Record<string, RemoteSelectionInfo>;
+  isReadOnly?: boolean;
 }
 
 export const GammaCard: React.FC<GammaCardProps> = ({
@@ -35,6 +43,8 @@ export const GammaCard: React.FC<GammaCardProps> = ({
   onSelectElement,
   isPresentationMode = false,
   onQuickAiAction,
+  remoteSelections = {},
+  isReadOnly = false,
 }) => {
   const updateElement = (elementId: string, updates: Partial<DesignElement>) => {
     const newElements = slide.elements.map(el => {
@@ -167,6 +177,7 @@ export const GammaCard: React.FC<GammaCardProps> = ({
         <div className="grid grid-cols-12 gap-3 sm:gap-4 md:gap-5 w-full items-stretch">
           {slide.elements.map((el, elIdx) => {
             const isSelected = selectedElementId === el.id;
+            const remote = remoteSelections[el.id];
             const spanClass = el.gridSpan || 'col-span-12 md:col-span-4';
 
             return (
@@ -174,21 +185,38 @@ export const GammaCard: React.FC<GammaCardProps> = ({
                 key={el.id}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onSelectElement(el.id);
+                  if (!isReadOnly) {
+                    onSelectElement(el.id);
+                  }
                 }}
                 className={`relative rounded-2xl transition-all duration-200 backdrop-blur-md flex flex-col justify-between ${spanClass} ${
-                  isSelected
+                  remote
+                    ? 'ring-2'
+                    : isSelected
                     ? 'ring-2 shadow-gamma-glow'
                     : 'hover:border-white/20 hover:translate-y-[-1px]'
                 }`}
                 style={{
                   backgroundColor: el.style?.backgroundColor || theme.cardBg,
-                  border: `1px solid ${isSelected ? theme.primary : theme.surfaceBorder}`,
+                  border: remote 
+                    ? `2px solid ${remote.colColor}` 
+                    : `1px solid ${isSelected ? theme.primary : theme.surfaceBorder}`,
+                  boxShadow: remote ? `0 0 16px ${remote.colColor}40` : undefined,
                   padding: el.style?.padding || '1.35rem',
                   borderRadius: '1.25rem',
                   textAlign: el.style?.textAlign || 'left',
                 }}
               >
+                {/* Live Remote Collaborator Indicator Badge */}
+                {remote && (
+                  <div
+                    className="absolute -top-3 left-4 px-2 py-0.5 rounded-full text-[10px] font-bold text-white shadow-lg flex items-center gap-1.5 z-30 pointer-events-none animate-fadeIn"
+                    style={{ backgroundColor: remote.colColor }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                    <span>{remote.colName} is editing</span>
+                  </div>
+                )}
                 {/* STAT BLOCK (Gamma Style: Huge number with gradient & subtle glow) */}
                 {el.type === 'stat-block' && (
                   <div className="flex flex-col justify-between h-full py-1">
