@@ -81,20 +81,32 @@ export const AVAILABLE_MODELS = [
   },
 ];
 
-export const getStoredModel = (): string => {
-  const local = localStorage.getItem(MODEL_KEY);
-  if (local) {
-    if (local.includes('claude-3-7') || local.includes('claude-3-5')) {
-      localStorage.setItem(MODEL_KEY, 'claude-sonnet-5-5');
-      return 'claude-sonnet-5-5';
-    }
-    if (AVAILABLE_MODELS.some(m => m.id === local) || local.startsWith('claude-')) return local;
-  }
+const VALID_MODEL_IDS = new Set(AVAILABLE_MODELS.map(m => m.id));
+
+export const sanitizeModel = (rawModel?: string): string => {
+  if (!rawModel) return 'claude-sonnet-5-5';
+  const m = rawModel.trim().toLowerCase();
+  if (VALID_MODEL_IDS.has(m)) return m;
+
+  // Clean fallback mapping for any legacy or third-party model keys
+  if (m.includes('opus')) return 'claude-opus-5-5';
+  if (m.includes('fable')) return 'claude-fable-5-1';
+  if (m.includes('haiku')) return 'claude-haiku-5-5';
   return 'claude-sonnet-5-5';
 };
 
+export const getStoredModel = (): string => {
+  const local = localStorage.getItem(MODEL_KEY);
+  const clean = sanitizeModel(local || undefined);
+  if (local !== clean) {
+    localStorage.setItem(MODEL_KEY, clean);
+  }
+  return clean;
+};
+
 export const setStoredModel = (model: string) => {
-  localStorage.setItem(MODEL_KEY, model);
+  const clean = sanitizeModel(model);
+  localStorage.setItem(MODEL_KEY, clean);
 };
 
 const SYSTEM_DESIGN_PROMPT = `You are "Gamma AI Design Architect" — an elite brand director, luxury print & presentation designer.
@@ -126,10 +138,7 @@ export async function callClaudeApi(
   overrideModel?: string
 ): Promise<string> {
   const apiKey = (overrideKey || getStoredApiKey()).trim();
-  const rawModel = overrideModel || getStoredModel();
-  const model = (rawModel.includes('claude-3-7') || rawModel.includes('claude-3-5'))
-    ? 'claude-sonnet-5-5'
-    : rawModel;
+  const model = sanitizeModel(overrideModel || getStoredModel());
 
   // Multi-tier endpoint fallback: Edge proxy -> Direct API
   const endpoints = [

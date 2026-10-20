@@ -49,6 +49,13 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
 
   const hasApiKey = Boolean(getStoredApiKey());
 
+  React.useEffect(() => {
+    if (isOpen) {
+      setSelectedModel(getStoredModel());
+      setErrorText(null);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleModelSelect = (id: string) => {

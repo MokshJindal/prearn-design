@@ -2,6 +2,35 @@ export const config = {
   runtime: 'edge',
 };
 
+const VALID_ANTHROPIC_MODELS = new Set([
+  'claude-sonnet-5-5',
+  'claude-opus-5-5',
+  'claude-fable-5-1',
+  'claude-haiku-5-5',
+  'claude-opus-5',
+  'claude-sonnet-5',
+  'claude-fable-5',
+  'claude-opus-4-8',
+  'claude-opus-4-7',
+  'claude-sonnet-4-6',
+  'claude-opus-4-6',
+  'claude-opus-4-5-20251101',
+  'claude-haiku-4-5-20251001',
+  'claude-sonnet-4-5-20250929',
+]);
+
+function sanitizeModel(rawModel?: string): string {
+  if (!rawModel) return 'claude-sonnet-5-5';
+  const m = rawModel.trim().toLowerCase();
+  if (VALID_ANTHROPIC_MODELS.has(m)) return m;
+
+  // Resilient fallback mapping for old/cached client models
+  if (m.includes('opus')) return 'claude-opus-5-5';
+  if (m.includes('fable')) return 'claude-fable-5-1';
+  if (m.includes('haiku')) return 'claude-haiku-5-5';
+  return 'claude-sonnet-5-5';
+}
+
 export default async function handler(req: Request) {
   // CORS Preflight
   if (req.method === 'OPTIONS') {
@@ -43,10 +72,8 @@ export default async function handler(req: Request) {
       );
     }
 
-    // Default to Claude Sonnet 5.5 flagship if not specified
-    if (!body.model) {
-      body.model = 'claude-sonnet-5-5';
-    }
+    // Sanitize model to guarantee official Anthropic account compatibility
+    body.model = sanitizeModel(body.model);
 
     // Set high output limit for limitless presentation generation
     if (!body.max_tokens) {
