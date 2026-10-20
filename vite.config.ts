@@ -7,13 +7,22 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      '/api/claude': {
+        target: 'https://api.anthropic.com',
+        changeOrigin: true,
+        rewrite: () => '/v1/messages',
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.removeHeader('origin');
+          });
+        },
+      },
       '/api/anthropic': {
         target: 'https://api.anthropic.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/anthropic/, ''),
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq) => {
-            // Remove origin header to satisfy Anthropic CORS/origin protection
             proxyReq.removeHeader('origin');
           });
         },

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Sparkles, 
@@ -6,8 +6,10 @@ import {
   RefreshCw, 
   Check, 
   Bot, 
-  Layers,
-  Crown
+  Crown,
+  AlertCircle,
+  ShieldCheck,
+  CheckCircle2
 } from 'lucide-react';
 import { DocumentType, AspectRatio } from '../types/design';
 import { THEMES } from '../services/themes';
@@ -15,7 +17,8 @@ import {
   generateFullDesignDocument, 
   AVAILABLE_MODELS, 
   getStoredModel, 
-  setStoredModel 
+  setStoredModel,
+  getStoredApiKey
 } from '../services/claude';
 import { DesignDocument } from '../types/design';
 
@@ -32,11 +35,14 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
 }) => {
   const [docType, setDocType] = useState<DocumentType>('pitch-deck');
   const [prompt, setPrompt] = useState('');
-  const [cardCount, setCardCount] = useState<number>(8);
+  const [cardCount, setCardCount] = useState<number>(5);
   const [themeId, setThemeId] = useState<string>('gamma-cosmic');
   const [selectedModel, setSelectedModel] = useState<string>(getStoredModel());
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusText, setStatusText] = useState('');
+  const [errorText, setErrorText] = useState<string | null>(null);
+
+  const hasApiKey = Boolean(getStoredApiKey());
 
   if (!isOpen) return null;
 
@@ -46,8 +52,8 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
   };
 
   const promptSuggestions = [
-    'Autonomous AI supply chain platform raising $4M Seed round. Include friction points, multi-agent architecture, $85B TAM, $1.6M ARR traction with 148% NRR, and ex-DeepMind team.',
-    'Luxury enterprise cybersecurity brochure for Zero-Trust cloud workloads with hardware root of trust, encrypted throughput, and SOC-2 compliance.',
+    'Autonomous AI supply chain platform raising $4M Seed round with multi-agent orchestration, $85B TAM, and $1.8M ARR traction.',
+    'Luxury enterprise cybersecurity brochure for Zero-Trust cloud workloads with hardware root of trust and SOC-2 compliance.',
     'B2B SaaS treasury management platform offering 5.2% yield on cash balances with multi-bank FDIC insurance.',
     'Frontier AI robotics developer conference flyer in San Francisco with 2,500 attendees and $1M venture pitch contest.',
   ];
@@ -57,8 +63,22 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
 
     try {
       setIsGenerating(true);
+      setErrorText(null);
       const activeModelObj = AVAILABLE_MODELS.find(m => m.id === selectedModel);
-      setStatusText(`${activeModelObj?.name || 'Claude'} is structuring narrative & design architecture...`);
+      setStatusText(`Contacting ${activeModelObj?.name?.split('(')[0] || 'Claude'}...`);
+
+      // Dynamic step timer for great user feedback
+      const timer1 = setTimeout(() => {
+        setStatusText('Structuring executive narrative & market opportunity...');
+      }, 2500);
+
+      const timer2 = setTimeout(() => {
+        setStatusText('Synthesizing Bento cards, metrics & visual tokens...');
+      }, 7000);
+
+      const timer3 = setTimeout(() => {
+        setStatusText('Applying Gamma ambient theme & layouts...');
+      }, 12000);
 
       const aspectRatio: AspectRatio = docType === 'pitch-deck' ? '16:9' : docType === 'brochure' ? 'trifold' : 'a4-portrait';
       const newDoc = await generateFullDesignDocument(
@@ -66,14 +86,19 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
         docType,
         themeId,
         aspectRatio,
-        cardCount
+        docType === 'brochure' ? 3 : cardCount
       );
 
-      setStatusText('Applying design tokens & vector layouts...');
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+
+      setStatusText('Complete! Opening canvas...');
       onCreated(newDoc);
       onClose();
     } catch (err: any) {
-      alert(`Generation Error: ${err.message}`);
+      console.error('Generation Error:', err);
+      setErrorText(err.message || 'Generation failed. Please check your API key or model selection.');
     } finally {
       setIsGenerating(false);
     }
@@ -89,14 +114,20 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <span>Create with Claude AI</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/20 text-purple-300 font-semibold">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-white">Create with Claude AI</h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/20 text-purple-300 font-semibold border border-purple-500/30">
                   GAMMA STUDIO
                 </span>
-              </h2>
+                {hasApiKey && (
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>API Connected</span>
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-neutral-400">
-                Generate pitch decks, luxury brochures, or one-pagers with Opus, Sonnet & Fable.
+                Generate high-impact pitch decks, luxury brochures, or one-pagers powered by Anthropic.
               </p>
             </div>
           </div>
@@ -110,6 +141,20 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+          {/* Error Banner */}
+          {errorText && (
+            <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-200 text-xs flex items-start gap-3">
+              <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <div className="font-bold text-white mb-0.5">Generation Error</div>
+                <div>{errorText}</div>
+                <div className="mt-2 text-[11px] text-red-300">
+                  Tip: Ensure your Claude API key is active. You can verify or update your key anytime in Settings (⚙️).
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 1. MODEL SELECTOR (Opus, Sonnet, Fable, Haiku) */}
           <div>
             <label className="text-xs font-semibold text-neutral-300 block mb-2 uppercase tracking-wider font-mono flex items-center gap-1.5">
@@ -152,7 +197,7 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {[
-                { type: 'pitch-deck' as DocumentType, label: 'Presentation', desc: '16:9 Slides', icon: '📽️' },
+                { type: 'pitch-deck' as DocumentType, label: 'Presentation', desc: '16:9 Pitch Deck', icon: '📽️' },
                 { type: 'brochure' as DocumentType, label: 'Brochure', desc: 'Tri-Fold Spread', icon: '📖' },
                 { type: 'one-pager' as DocumentType, label: 'One-Pager', desc: 'Executive Brief', icon: '📄' },
                 { type: 'flyer' as DocumentType, label: 'Flyer', desc: 'Launch Poster', icon: '🎨' },
@@ -188,7 +233,7 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
               placeholder={
                 docType === 'brochure'
                   ? 'e.g., A luxury corporate brochure for an elite AI venture studio, covering our philosophy, 3 core innovation pillars, enterprise case studies, and London/SF contact details...'
-                  : 'e.g., A pitch deck for an autonomous enterprise AI platform raising $4M Seed round, highlighting friction points, multi-agent architecture, $1.4M ARR traction, and team...'
+                  : 'e.g., A pitch deck for an autonomous enterprise AI platform raising $4M Seed round, highlighting friction points, multi-agent architecture, $1.8M ARR traction, and team...'
               }
               rows={4}
               className="w-full bg-[#0E0F17] border border-white/10 rounded-2xl p-4 text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-purple-500 transition-colors resize-none font-sans"
@@ -221,22 +266,29 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
                 4. {docType === 'brochure' ? 'Brochure Panels' : 'Card Count'}: <span className="text-purple-400 font-bold">{docType === 'brochure' ? '3 Panels' : `${cardCount} Cards`}</span>
               </label>
               {docType === 'brochure' ? (
-                <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-300 text-xs font-medium">
-                  📖 Tri-Fold Panoramic Spread (Cover, Inside, Back)
+                <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-300 text-xs font-medium flex items-center gap-2">
+                  <span>📖</span>
+                  <span>Tri-Fold Panoramic Spread (Cover, Inside, Back)</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  {[4, 6, 8, 10, 12].map((cnt) => (
+                  {[
+                    { cnt: 4, desc: 'Teaser' },
+                    { cnt: 5, desc: 'Recommended' },
+                    { cnt: 6, desc: 'Standard' },
+                    { cnt: 7, desc: 'In-Depth' }
+                  ].map(({ cnt, desc }) => (
                     <button
                       key={cnt}
                       onClick={() => setCardCount(cnt)}
-                      className={`flex-1 py-1.5 rounded-xl border text-xs font-mono font-semibold transition-all ${
+                      className={`flex-1 py-1.5 px-2 rounded-xl border text-xs font-mono font-semibold transition-all flex flex-col items-center ${
                         cardCount === cnt
                           ? 'bg-purple-600 text-white border-purple-500 shadow-sm'
                           : 'bg-white/[0.02] border-white/10 text-neutral-400 hover:text-white'
                       }`}
                     >
-                      {cnt}
+                      <span>{cnt}</span>
+                      <span className="text-[9px] opacity-70 font-sans">{desc}</span>
                     </button>
                   ))}
                 </div>
@@ -275,11 +327,14 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
 
           {/* Progress / Status indicator */}
           {isGenerating && (
-            <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center gap-3">
+            <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center gap-3 animate-pulse">
               <RefreshCw className="w-5 h-5 text-purple-400 animate-spin" />
               <div>
-                <div className="text-xs font-bold text-white">Generating with Claude...</div>
-                <div className="text-[11px] text-purple-300">{statusText}</div>
+                <div className="text-xs font-bold text-white flex items-center gap-2">
+                  <span>Generating with {selectedModel}...</span>
+                  <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping" />
+                </div>
+                <div className="text-[11px] text-purple-300 mt-0.5">{statusText}</div>
               </div>
             </div>
           )}

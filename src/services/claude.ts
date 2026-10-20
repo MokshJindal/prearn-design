@@ -12,7 +12,9 @@ const MODEL_KEY = 'prearn_claude_model';
 export const getStoredApiKey = (): string => {
   const local = localStorage.getItem(STORAGE_KEY);
   if (local && local.trim()) return local.trim();
-  return (import.meta.env.VITE_ANTHROPIC_API_KEY as string) || '';
+  const envKey = (import.meta.env.VITE_ANTHROPIC_API_KEY as string);
+  if (envKey && envKey.trim()) return envKey.trim();
+  return '';
 };
 
 export const setStoredApiKey = (key: string) => {
@@ -84,14 +86,11 @@ DESIGN ARCHETYPES:
      * Panel 1: Cover Masthead (Brand Title, Premium Tagline, Established Badge, Core Mission)
      * Panel 2: Core Capabilities & Philosophy (Detailed offering pillars with icons, methodology 01/02/03)
      * Panel 3: Service Tiers & Solutions (Pricing/tier breakdown, feature checklist, quantifiable ROI metrics)
-     * Panel 4: Client Proof & Case Studies (Enterprise testimonial quote, verified impact stats)
-     * Panel 5: Contact & Action Panel (Direct contact details, headquarters location, website, guarantee)
 
 3. STRICT CONSTRAINTS:
-   - Keep descriptions sharp, editorial, and punchy.
-   - Return ONLY a single valid JSON object.
-   - Terminate all brackets and strings.
-   - Do NOT include markdown commentary outside the JSON block.`;
+   - Keep descriptions sharp, editorial, and punchy (1-2 sentences max per element).
+   - Return ONLY a single valid JSON object adhering strictly to the requested schema.
+   - Never output markdown commentary before or after the JSON block.`;
 
 export async function callClaudeApi(
   prompt: string,
@@ -102,11 +101,9 @@ export async function callClaudeApi(
   const apiKey = (overrideKey || getStoredApiKey()).trim();
   const model = overrideModel || getStoredModel();
 
-  if (!apiKey) {
-    throw new Error('Claude API Key is missing. Please set your Anthropic API Key in Settings.');
-  }
-
+  // Multi-tier endpoint fallback: Edge proxy -> Direct API -> Local proxy
   const endpoints = [
+    { url: '/api/claude', useDirect: false },
     { url: 'https://api.anthropic.com/v1/messages', useDirect: true },
     { url: '/api/anthropic/v1/messages', useDirect: false }
   ];
@@ -114,12 +111,20 @@ export async function callClaudeApi(
   let lastError: Error | null = null;
 
   for (const endpoint of endpoints) {
+    // Skip direct client-to-Anthropic call if no client key is configured
+    if (!apiKey && endpoint.useDirect) {
+      continue;
+    }
+
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
       };
+
+      if (apiKey) {
+        headers['x-api-key'] = apiKey;
+      }
 
       if (endpoint.useDirect) {
         headers['anthropic-dangerous-direct-browser-access'] = 'true';
@@ -127,7 +132,7 @@ export async function callClaudeApi(
 
       const requestBody: any = {
         model,
-        max_tokens: 8192,
+        max_tokens: 4096,
         system: systemPrompt,
         messages: [
           {
@@ -137,17 +142,29 @@ export async function callClaudeApi(
         ],
       };
 
-      // For Claude 5.x series (Sonnet 5.5, Opus 5.5, Fable 5.1), enable adaptive thinking with low effort to prevent burning tokens on thinking
+      // For Claude 5.x series (Sonnet 5.5, Opus 5.5, Fable 5.1), enable adaptive thinking with low effort
       if (model.includes('-5')) {
         requestBody.thinking = { type: 'adaptive' };
         requestBody.output_config = { effort: 'low' };
       }
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
       const response = await fetch(endpoint.url, {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
+
+      // If route returned an HTML page (e.g. 404 rewrite to index.html on misconfigured server), continue to next endpoint
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('text/html')) {
+        continue;
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -157,7 +174,7 @@ export async function callClaudeApi(
 
       const data = await response.json();
       
-      // Robust text extraction from content blocks (filters out thinking blocks)
+      // Extract text content (filter out thinking blocks)
       const textBlocks = (data.content || [])
         .filter((block: any) => block.type === 'text' && typeof block.text === 'string')
         .map((block: any) => block.text);
@@ -165,12 +182,11 @@ export async function callClaudeApi(
       const text = textBlocks.join('\n').trim();
       
       if (!text) {
-        // Fallback: check if content[0].text exists
         const fallbackText = data.content?.[0]?.text;
         if (fallbackText) {
           return fallbackText;
         }
-        throw new Error('Claude was still reasoning and did not output text. Please try again or switch to Claude Sonnet 5.5.');
+        throw new Error('Claude response did not contain text. Please try again.');
       }
 
       return text;
@@ -180,7 +196,7 @@ export async function callClaudeApi(
     }
   }
 
-  throw lastError || new Error('Failed to reach Anthropic Claude API.');
+  throw lastError || new Error('Failed to reach Anthropic Claude API. Please check your network connection.');
 }
 
 /**
@@ -193,6 +209,12 @@ function cleanAndParseJSON<T>(rawText: string): T {
   const markdownMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
   if (markdownMatch && markdownMatch[1]) {
     cleaned = markdownMatch[1].trim();
+  } else {
+    // Truncated fence opening
+    const openFence = cleaned.match(/```(?:json)?\s*([\s\S]*)/);
+    if (openFence && openFence[1]) {
+      cleaned = openFence[1].trim();
+    }
   }
 
   const firstBrace = cleaned.indexOf('{');
@@ -219,9 +241,9 @@ function cleanAndParseJSON<T>(rawText: string): T {
   } catch (e2) {}
 
   // LEVEL 3: Slide boundary auto-truncation recovery
-  const lastSlideEnd = s.lastIndexOf('},');
-  if (lastSlideEnd !== -1) {
-    const candidate = s.substring(0, lastSlideEnd + 1) + '\n  ]\n}';
+  const lastSlideBoundary = s.lastIndexOf('},');
+  if (lastSlideBoundary !== -1) {
+    const candidate = s.substring(0, lastSlideBoundary + 1) + '\n  ]\n}';
     const cleanedCandidate = candidate.replace(/,\s*([}\]])/g, '$1');
     try {
       return JSON.parse(cleanedCandidate) as T;
@@ -296,23 +318,22 @@ export async function generateFullDesignDocument(
   docType: DocumentType = 'pitch-deck',
   themeId: string = 'gamma-cosmic',
   aspectRatio: any = '16:9',
-  numCards: number = 8
+  numCards: number = 5
 ): Promise<DesignDocument> {
   const isBrochure = docType === 'brochure';
+  const effectiveCards = isBrochure ? 3 : Math.min(Math.max(numCards, 3), 7);
 
   const prompt = isBrochure
     ? `You are an award-winning creative director at Pentagram designing a multi-panel luxury corporate brochure for:
 "${userPrompt}"
 
-Deliverable: Luxury Corporate Brochure (Multi-Panel Spread)
+Deliverable: Luxury Corporate Brochure (Multi-Panel Tri-Fold Spread)
 Theme: ${themeId}
 
-Structure the brochure into 3 to 5 distinct, high-end editorial panels:
-1. Cover Panel: Bold Brand Title, luxury tagline, established badge, core executive statement.
-2. Inside Left - Capabilities & Value Proposition: 3 numbered pillars (01, 02, 03) with tags and punchy descriptions.
-3. Inside Center - Solutions & Deliverables: Service breakdown with checklist bullet points and stat counters.
-4. Inside Right - Client Proof & Track Record: High-impact quote/testimonial + 3 verified ROI metrics.
-5. Back Panel - Action & Direct Contact: Booking CTA button, headquarters address, email, phone, and guarantee badge.
+Structure the brochure into 3 distinct, high-end editorial panels:
+1. Panel 01 - Cover Masthead: Bold Brand Title, luxury tagline, established badge, core executive statement, hero stat.
+2. Panel 02 - Core Capabilities & Methodology: 3 numbered pillars (01, 02, 03) with tags, punchy descriptions, and verified impact metrics.
+3. Panel 03 - Solutions & Direct Contact: Service breakdown with checklist bullet points, enterprise client testimonial quote, and headquarters contact details.
 
 Return ONLY a single valid JSON object adhering strictly to this schema:
 {
@@ -326,8 +347,8 @@ Return ONLY a single valid JSON object adhering strictly to this schema:
   "slides": [
     {
       "id": "panel-1",
-      "title": "Panel Title",
-      "category": "title",
+      "title": "Cover Panel",
+      "category": "MASTHEAD",
       "layout": "hero",
       "badge": "LUXURY BROCHURE // 2026",
       "headline": "Bold Editorial Masthead",
@@ -335,26 +356,91 @@ Return ONLY a single valid JSON object adhering strictly to this schema:
       "elements": [
         {
           "id": "el-1",
+          "type": "stat-block",
+          "statValue": "99.98%",
+          "statLabel": "Client Success Rate",
+          "statChange": "Industry benchmark",
+          "gridSpan": "col-span-12 md:col-span-6"
+        },
+        {
+          "id": "el-2",
           "type": "feature-card",
           "title": "Core Specialization",
           "subtitle": "Pillar Subhead",
           "content": "Crisp editorial copy describing the capability.",
           "tag": "CAPABILITY",
           "gridSpan": "col-span-12 md:col-span-6"
+        }
+      ]
+    },
+    {
+      "id": "panel-2",
+      "title": "Capabilities & Architecture",
+      "category": "PILLARS",
+      "layout": "three-column",
+      "badge": "METHODOLOGY",
+      "headline": "Engineered for Exponential Performance",
+      "subheadline": "Three core foundations driving verified enterprise outcomes.",
+      "elements": [
+        {
+          "id": "el-2-1",
+          "type": "feature-card",
+          "title": "01 // Autonomous Precision",
+          "content": "Real-time decision pipelines optimizing throughput with zero manual friction.",
+          "tag": "CORE ARCHITECTURE",
+          "gridSpan": "col-span-12 md:col-span-4"
         },
         {
-          "id": "el-2",
+          "id": "el-2-2",
+          "type": "feature-card",
+          "title": "02 // Institutional Governance",
+          "content": "Full SOC-2 Type II audit trail and cryptographic tamper resistance.",
+          "tag": "SECURITY",
+          "gridSpan": "col-span-12 md:col-span-4"
+        },
+        {
+          "id": "el-2-3",
           "type": "stat-block",
-          "statValue": "99.98%",
-          "statLabel": "Client Success Rate",
-          "statChange": "Industry benchmark",
+          "statValue": "10x",
+          "statLabel": "Speed-to-Execution",
+          "statChange": "Across all Tier-1 deployments",
+          "gridSpan": "col-span-12 md:col-span-4"
+        }
+      ]
+    },
+    {
+      "id": "panel-3",
+      "title": "Client Proof & Contact",
+      "category": "ACTION",
+      "layout": "bento-grid",
+      "badge": "PARTNERSHIP",
+      "headline": "Begin Your Transformation",
+      "subheadline": "Direct private client advisory and white-glove onboarding.",
+      "elements": [
+        {
+          "id": "el-3-1",
+          "type": "quote",
+          "quoteText": "Prearn redefined how our board views automated execution — truly standard-setting.",
+          "quoteAuthor": "Elena Rostova",
+          "quoteRole": "Managing Director, Apex Capital",
+          "gridSpan": "col-span-12 md:col-span-6"
+        },
+        {
+          "id": "el-3-2",
+          "type": "checklist",
+          "title": "Advisory Deliverables",
+          "checklistItems": [
+            "Complete Architecture Blueprint",
+            "Dedicated Principal Partner",
+            "24/7 Priority SLA & Escalation"
+          ],
           "gridSpan": "col-span-12 md:col-span-6"
         }
       ]
     }
   ]
 }`
-    : `Generate a complete, production-grade, ultra-premium ${docType} design document with ${numCards} slides based on this brief:
+    : `You are an elite Silicon Valley creative director at Gamma AI designing an ultra-premium ${docType} with ${effectiveCards} high-impact presentation cards for:
 "${userPrompt}"
 
 Document Type: ${docType}
@@ -362,19 +448,19 @@ Preferred Aspect Ratio: ${aspectRatio}
 Theme ID: ${themeId}
 
 Instructions:
-- Keep all descriptions punchy, quantitative, and executive (1-2 sentences max per element).
-- Generate ${numCards} cards covering essential sections: Title Hero, Problem, Solution, Market Opportunity, Product Pillars, Traction & Metrics, Competitor Matrix, and The Ask / Closing.
-- For each slide, you MUST include BOTH structured metadata (title, category, headline, subheadline, elements) AND an "html" property containing a complete, visually breathtaking 16:9 card in modern Tailwind CSS + SVG:
-  * Use deep ambient glow orbs (e.g., <div class="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-purple-600/20 blur-[100px] pointer-events-none"></div>)
-  * High-contrast Bento cards (backdrop-blur-xl bg-white/[0.04] border border-white/10 rounded-2xl p-6 hover:border-purple-500/30)
-  * Large, bold stat displays ($1.4M ARR, 142% NRR) with gradient accents (bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent)
-  * Clean SVG icons and visual badges
-  * High readability and generous breathing room.
-- Return ONLY valid JSON adhering strictly to this schema:
+- Keep all copy sharp, quantitative, and executive (1-2 punchy sentences per element).
+- Generate exactly ${effectiveCards} cards covering essential sections:
+  Card 1: Executive Hook & Vision (Category, bold headline, thesis subheadline, 2 stat blocks)
+  Card 2: Market Problem & Friction (Quantifiable pain points, market losses)
+  Card 3: Solution & Core AI Architecture (Pillars, capabilities, differentiators)
+  Card 4: Traction, Unit Economics & Metrics ($ ARR, NRR %, pilot counts)
+  Card 5: The Ask & Leadership Team (Funding round details, key partners, use of funds)
+
+Return ONLY valid JSON adhering strictly to this schema:
 {
   "id": "deck-${Date.now()}",
   "title": "Short Deck Title",
-  "subtitle": "Subtitle description",
+  "subtitle": "High-impact subtitle thesis",
   "type": "${docType}",
   "aspectRatio": "${aspectRatio}",
   "themeId": "${themeId}",
@@ -382,21 +468,29 @@ Instructions:
   "slides": [
     {
       "id": "slide-1",
-      "title": "Title Card",
-      "category": "title",
+      "title": "Executive Vision",
+      "category": "VISION",
       "layout": "hero",
-      "badge": "CATEGORY BADGE",
-      "headline": "Bold Executive Headline",
-      "subheadline": "Contextual subheadline (1 sentence)",
-      "html": "<div class='relative w-full h-full overflow-hidden bg-[#090A10] text-white p-10 flex flex-col justify-between rounded-3xl border border-white/10 font-sans'>...</div>",
+      "badge": "SEED ROUND // 2026",
+      "headline": "Bold Punchy Headline",
+      "subheadline": "Compelling single-sentence executive thesis.",
       "elements": [
         {
           "id": "el-1",
           "type": "stat-block",
-          "statValue": "$3.5M",
-          "statLabel": "Metric Label",
-          "statChange": "Growth detail",
+          "statValue": "$85B",
+          "statLabel": "Market Addressable",
+          "statChange": "+24% YoY growth",
           "gridSpan": "col-span-12 md:col-span-4"
+        },
+        {
+          "id": "el-2",
+          "type": "feature-card",
+          "title": "Autonomous Predictive Routing",
+          "subtitle": "Agentic Optimization",
+          "content": "Self-healing logistics networks reroute shipments in real-time before delays manifest.",
+          "tag": "CORE AI ENGINE",
+          "gridSpan": "col-span-12 md:col-span-8"
         }
       ],
       "notes": "Speaker notes"
@@ -435,33 +529,39 @@ ${JSON.stringify(currentSlide, null, 2)}
 
 Instructions:
 - Fully implement the user's requested changes.
-- Provide BOTH structured metadata AND an "html" property containing a complete, visually breathtaking 16:9 card in modern Tailwind CSS + SVG:
-  * Ambient glow background
-  * High-contrast Bento cards, stats, tables, or diagrams matching the request
-  * Sharp typography hierarchy.
-Return ONLY the updated SlidePage as a single valid JSON object adhering to the schema (id, title, category, layout, badge, headline, subheadline, description, html, elements, notes).`
+- Provide structured metadata: title, category, layout, badge, headline, subheadline, elements (stat-blocks, feature-cards, quotes, checklists).
+- Keep descriptions punchy and quantitative.
+Return ONLY the updated SlidePage as a single valid JSON object adhering to the schema.`
     : `Create a single brand-new, ultra-premium slide for a deck titled "${contextDeckTitle || 'Executive Presentation'}".
 User Instruction: "${userInstruction}"
 
 Instructions:
-- Provide BOTH structured metadata AND an "html" property containing a complete, visually breathtaking 16:9 card in modern Tailwind CSS + SVG.
+- Provide structured metadata: title, category, layout, badge, headline, subheadline, elements.
 Return ONLY a single valid JSON object adhering to the SlidePage schema:
 {
   "id": "slide-${Date.now()}",
   "title": "Slide Title",
-  "category": "problem",
+  "category": "PROBLEM",
   "layout": "bento-grid",
-  "badge": "CATEGORY BADGE",
+  "badge": "MARKET FRICTION",
   "headline": "Bold Punchy Headline",
   "subheadline": "Secondary supporting context",
-  "html": "<div class='relative w-full h-full overflow-hidden bg-[#090A10] text-white p-10 flex flex-col justify-between rounded-3xl border border-white/10 font-sans'>...</div>",
   "elements": [
     {
       "id": "el-1",
       "type": "stat-block",
       "statValue": "$5.2M",
-      "statLabel": "Metric",
+      "statLabel": "Annual Friction",
+      "statChange": "Critical risk point",
       "gridSpan": "col-span-12 md:col-span-4"
+    },
+    {
+      "id": "el-2",
+      "type": "feature-card",
+      "title": "Legacy Architecture Bottleneck",
+      "content": "Outdated systems fail to scale under high-frequency workload demands.",
+      "tag": "BOTTLENECK",
+      "gridSpan": "col-span-12 md:col-span-8"
     }
   ],
   "notes": "Speaker notes"
@@ -478,14 +578,21 @@ Return ONLY a single valid JSON object adhering to the SlidePage schema:
  */
 export async function refineTextWithClaude(
   text: string,
-  tone: 'punchy' | 'executive' | 'data-heavy' | 'shorter'
+  action: 'punchy' | 'executive' | 'shorter' | 'expand' | 'fix' | 'data-heavy'
 ): Promise<string> {
-  const prompt = `Rewrite this text for a top-tier presentation or brochure to be ${tone}. Return ONLY the rewritten text with no quotes, commentary or extra formatting:
-"${text}"`;
+  const actionPrompts = {
+    punchy: 'Rewrite this text to be ultra-punchy, magnetic, and high-impact for an investor pitch deck:',
+    executive: 'Rewrite this text in an authoritative, Fortune-500 executive tone:',
+    shorter: 'Condense this text down to its essential high-impact core (1 concise sentence):',
+    expand: 'Expand this with 1 supporting quantitative detail or strategic insight:',
+    fix: 'Fix grammar, improve rhythm and elevate typography polish while preserving exact meaning:',
+    'data-heavy': 'Inject concrete metrics, percentages, dollar values, or ROI numbers into this text:',
+  };
 
-  const raw = await callClaudeApi(
-    prompt,
-    'You are an executive copywriter. Output only the rewritten string directly.'
-  );
-  return raw.trim().replace(/^"(.*)"$/, '$1');
+  const prompt = `${actionPrompts[action]}
+"${text}"
+
+Return ONLY the refined text. No quotes, no markdown fences, no explanatory preamble.`;
+
+  return await callClaudeApi(prompt, 'You are an elite editorial copywriter at Pentagram.');
 }
