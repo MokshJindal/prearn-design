@@ -21,84 +21,76 @@ export const setStoredApiKey = (key: string) => {
   localStorage.setItem(STORAGE_KEY, key.trim());
 };
 
-// Official model mapping & alias resolution
-export function normalizeModel(rawModel: string): string {
-  const map: Record<string, string> = {
-    'claude-sonnet-5-5': 'claude-3-7-sonnet-20250219',
-    'claude-opus-5-5': 'claude-3-opus-20240229',
-    'claude-fable-5-1': 'claude-3-5-sonnet-20241022',
-    'claude-haiku-5-5': 'claude-3-5-haiku-20241022',
-    'claude-sonnet-4-5-20250929': 'claude-3-5-sonnet-20241022',
-    'claude-opus-4-5-20251101': 'claude-3-opus-20240229',
-    'claude-3-7-sonnet': 'claude-3-7-sonnet-20250219',
-    'claude-3-7-sonnet-latest': 'claude-3-7-sonnet-20250219',
-    'claude-3-5-sonnet': 'claude-3-5-sonnet-20241022',
-    'claude-3-5-sonnet-latest': 'claude-3-5-sonnet-20241022',
-    'claude-3-opus': 'claude-3-opus-20240229',
-    'claude-3-opus-latest': 'claude-3-opus-20240229',
-    'claude-3-5-haiku': 'claude-3-5-haiku-20241022',
-    'claude-3-5-haiku-latest': 'claude-3-5-haiku-20241022',
-  };
-  return map[rawModel] || rawModel;
-}
-
-// Available Anthropic models
+// Verified Anthropic models available on this account
 export const AVAILABLE_MODELS = [
   { 
-    id: 'claude-3-7-sonnet-20250219', 
-    name: 'Claude 3.7 Sonnet (Hybrid Reasoning & Visual Design)', 
+    id: 'claude-sonnet-5-5', 
+    name: 'Claude Sonnet 5.5 (Flagship Designer)', 
     category: 'Sonnet',
     badge: 'FLAGSHIP',
-    description: 'Anthropic flagship: elite visual architecture, modern layouts, multi-column precision & executive copy' 
+    description: 'Anthropic 5.5 flagship: elite visual architecture, modern layouts, multi-column precision & executive copy' 
   },
   { 
-    id: 'claude-3-5-sonnet-20241022', 
-    name: 'Claude 3.5 Sonnet (Industry Standard)', 
-    category: 'Sonnet',
-    badge: 'PRO',
-    description: 'High-speed visual design, YC pitch deck storytelling & responsive bento card generation' 
-  },
-  { 
-    id: 'claude-3-opus-20240229', 
-    name: 'Claude 3 Opus (Supreme Intelligence & Depth)', 
+    id: 'claude-opus-5-5', 
+    name: 'Claude Opus 5.5 (Supreme Intelligence & Depth)', 
     category: 'Opus',
     badge: 'EXECUTIVE',
-    description: 'Maximum narrative depth: luxury corporate brochures, executive strategy & comprehensive analysis' 
+    description: 'Maximum narrative depth: luxury corporate brochures, high-conviction strategy & diligence memorandums' 
   },
   { 
-    id: 'claude-3-5-haiku-20241022', 
-    name: 'Claude 3.5 Haiku (Lightning 0-Latency)', 
+    id: 'claude-fable-5-1', 
+    name: 'Claude Fable 5.1 (Creative & Narrative)', 
+    category: 'Fable',
+    badge: 'CREATIVE',
+    description: 'Specialized creative narrative, marketing copy, brand voice & high-conversion brochures' 
+  },
+  { 
+    id: 'claude-haiku-5-5', 
+    name: 'Claude Haiku 5.5 (Ultra-Fast 0-Latency)', 
     category: 'Haiku',
     badge: 'FAST',
     description: 'Lightning speed: instant card ideation, rapid text refinement & quick slide expansions' 
   },
   { 
-    id: 'claude-sonnet-5-5', 
-    name: 'Claude Sonnet 5.5 (Studio Designer)', 
-    category: 'Sonnet',
-    badge: 'STUDIO',
-    description: 'Pentagram-inspired visual identity with luxury editorial typography and dark-mode aesthetics' 
-  },
-  { 
-    id: 'claude-opus-5-5', 
-    name: 'Claude Opus 5.5 (Master Strategist)', 
+    id: 'claude-opus-5', 
+    name: 'Claude Opus 5 (Master Strategist)', 
     category: 'Opus',
     badge: 'STRATEGY',
-    description: 'Deep institutional reasoning for 20+ slide investment memorandums and corporate whitepapers' 
+    description: 'Deep institutional reasoning for complex multi-slide whitepapers and technical specs' 
   },
   { 
-    id: 'claude-fable-5-1', 
-    name: 'Claude Fable 5.1 (Creative Narrative)', 
-    category: 'Fable',
-    badge: 'CREATIVE',
-    description: 'High-conversion marketing copy, tri-fold brochures & compelling brand storytelling' 
+    id: 'claude-opus-4-6', 
+    name: 'Claude Opus 4.6 (Enterprise Reasoning)', 
+    category: 'Opus',
+    badge: 'ENTERPRISE',
+    description: 'Advanced financial projections, unit economics models & competitor matrices' 
+  },
+  { 
+    id: 'claude-sonnet-4-5-20250929', 
+    name: 'Claude Sonnet 4.5', 
+    category: 'Sonnet',
+    badge: 'RELIABLE',
+    description: 'High-speed reliable visual design generator' 
+  },
+  { 
+    id: 'claude-opus-4-5-20251101', 
+    name: 'Claude Opus 4.5', 
+    category: 'Opus',
+    badge: 'RELIABLE',
+    description: 'Deep technical reasoning & enterprise whitepapers' 
   },
 ];
 
 export const getStoredModel = (): string => {
   const local = localStorage.getItem(MODEL_KEY);
-  if (local && (AVAILABLE_MODELS.some(m => m.id === local) || local.startsWith('claude-'))) return local;
-  return 'claude-3-7-sonnet-20250219';
+  if (local) {
+    if (local.includes('claude-3-7') || local.includes('claude-3-5')) {
+      localStorage.setItem(MODEL_KEY, 'claude-sonnet-5-5');
+      return 'claude-sonnet-5-5';
+    }
+    if (AVAILABLE_MODELS.some(m => m.id === local) || local.startsWith('claude-')) return local;
+  }
+  return 'claude-sonnet-5-5';
 };
 
 export const setStoredModel = (model: string) => {
@@ -135,13 +127,14 @@ export async function callClaudeApi(
 ): Promise<string> {
   const apiKey = (overrideKey || getStoredApiKey()).trim();
   const rawModel = overrideModel || getStoredModel();
-  const model = normalizeModel(rawModel);
+  const model = (rawModel.includes('claude-3-7') || rawModel.includes('claude-3-5'))
+    ? 'claude-sonnet-5-5'
+    : rawModel;
 
-  // Multi-tier endpoint fallback: Edge proxy -> Direct API -> Local proxy
+  // Multi-tier endpoint fallback: Edge proxy -> Direct API
   const endpoints = [
     { url: '/api/claude', useDirect: false },
-    { url: 'https://api.anthropic.com/v1/messages', useDirect: true },
-    { url: '/api/anthropic/v1/messages', useDirect: false }
+    { url: 'https://api.anthropic.com/v1/messages', useDirect: true }
   ];
 
   let lastError: Error | null = null;

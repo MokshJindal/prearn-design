@@ -167,8 +167,8 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
                 8192 Token Buffer
               </span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {AVAILABLE_MODELS.slice(0, 3).map((m) => (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {AVAILABLE_MODELS.slice(0, 4).map((m) => (
                 <button
                   key={m.id}
                   onClick={() => handleModelSelect(m.id)}
@@ -183,6 +183,7 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
                       {m.category === 'Opus' && <Crown className="w-3 h-3 text-amber-400" />}
                       {m.category === 'Sonnet' && <Sparkles className="w-3 h-3 text-purple-400" />}
                       {m.category === 'Fable' && <Wand2 className="w-3 h-3 text-cyan-400" />}
+                      {m.category === 'Haiku' && <Bot className="w-3 h-3 text-emerald-400" />}
                       <span>{m.category}</span>
                     </span>
                     {selectedModel === m.id && <Check className="w-3.5 h-3.5 text-purple-400" />}
