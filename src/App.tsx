@@ -6,6 +6,7 @@ import {
   DesignElement 
 } from './types/design';
 import { storageService } from './services/storage';
+import { STARTER_PITCH_DECK } from './services/templates';
 import { getTheme } from './services/themes';
 import { HomePage } from './components/HomePage';
 import { Navbar } from './components/Navbar';
@@ -26,12 +27,13 @@ export function App() {
 
   // Load from robust storageService
   const [documents, setDocuments] = useState<DesignDocument[]>(() => {
-    return storageService.loadAll();
+    const all = storageService.loadAll();
+    return all && all.length ? all : [STARTER_PITCH_DECK];
   });
 
   const [currentDoc, setCurrentDoc] = useState<DesignDocument>(() => {
     const all = storageService.loadAll();
-    return all[0] || storageService.loadAll()[0];
+    return (all && all[0]) || STARTER_PITCH_DECK;
   });
 
   const [activeSlideIndex, setActiveSlideIndex] = useState<number>(0);
@@ -60,12 +62,15 @@ export function App() {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
+  // Safe fallback document
+  const safeDoc = currentDoc || STARTER_PITCH_DECK;
+
   // Undo history for active editor
-  const [history, setHistory] = useState<DesignDocument[]>([currentDoc]);
+  const [history, setHistory] = useState<DesignDocument[]>([safeDoc]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
-  const activeTheme = getTheme(currentDoc.themeId);
-  const currentSlide = currentDoc.slides[activeSlideIndex] || currentDoc.slides[0];
+  const activeTheme = getTheme(safeDoc.themeId || 'gamma-cosmic');
+  const currentSlide = (safeDoc.slides && safeDoc.slides[activeSlideIndex]) || safeDoc.slides?.[0] || STARTER_PITCH_DECK.slides[0];
   const selectedElement = currentSlide?.elements?.find(el => el.id === selectedElementId) || null;
 
   const pushDocState = (newDoc: DesignDocument) => {

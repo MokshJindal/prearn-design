@@ -30,9 +30,18 @@ export const storageService = {
 
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
-      return [];
+      
+      // Fallback: If empty or cleared, return starters
+      const defaults = [
+        STARTER_PITCH_DECK, 
+        STARTER_BROCHURE, 
+        STARTER_ONE_PAGER, 
+        STARTER_FLYER
+      ];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
+      return defaults;
     } catch (err) {
       console.error('Failed to load projects from storage:', err);
       return [STARTER_PITCH_DECK];
