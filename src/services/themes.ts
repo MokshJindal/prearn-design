@@ -1,0 +1,93 @@
+import { ThemeColors } from '../types/design';
+
+export const THEMES: ThemeColors[] = [
+  {
+    id: 'gamma-cosmic',
+    name: 'Gamma Cosmic (Indigo & Cyan)',
+    category: 'dark',
+    bg: '#090A10',
+    surface: '#121420',
+    surfaceBorder: 'rgba(255, 255, 255, 0.08)',
+    primary: '#8B5CF6', // Gamma vibrant violet
+    primaryHover: '#7C3AED',
+    accent: '#06B6D4', // Vibrant Cyan
+    textPrimary: '#F8FAFC',
+    textSecondary: '#94A3B8',
+    textMuted: '#64748B',
+    cardBg: 'rgba(21, 23, 36, 0.75)',
+    badgeBg: 'rgba(139, 92, 246, 0.15)',
+    badgeText: '#C4B5FD',
+  },
+  {
+    id: 'gamma-claude',
+    name: 'Gamma Claude (Terracotta Obsidian)',
+    category: 'dark',
+    bg: '#0E0D0C',
+    surface: '#171614',
+    surfaceBorder: 'rgba(255, 255, 255, 0.08)',
+    primary: '#DA7756', // Claude Signature
+    primaryHover: '#C46545',
+    accent: '#F3EFEA',
+    textPrimary: '#FAF8F5',
+    textSecondary: '#C8C4BE',
+    textMuted: '#7A766F',
+    cardBg: 'rgba(28, 26, 23, 0.75)',
+    badgeBg: 'rgba(218, 119, 86, 0.15)',
+    badgeText: '#FDBA74',
+  },
+  {
+    id: 'gamma-emerald',
+    name: 'Gamma Emerald (Venture Green)',
+    category: 'dark',
+    bg: '#07100D',
+    surface: '#0E1B15',
+    surfaceBorder: 'rgba(255, 255, 255, 0.08)',
+    primary: '#10B981',
+    primaryHover: '#059669',
+    accent: '#34D399',
+    textPrimary: '#F0FDF4',
+    textSecondary: '#A7F3D0',
+    textMuted: '#6EE7B7',
+    cardBg: 'rgba(15, 31, 24, 0.75)',
+    badgeBg: 'rgba(16, 185, 129, 0.15)',
+    badgeText: '#6EE7B7',
+  },
+  {
+    id: 'gamma-coral',
+    name: 'Gamma Sunset (Neon Coral & Amber)',
+    category: 'dark',
+    bg: '#0F0910',
+    surface: '#1A121E',
+    surfaceBorder: 'rgba(255, 255, 255, 0.08)',
+    primary: '#F43F5E',
+    primaryHover: '#E11D48',
+    accent: '#F59E0B',
+    textPrimary: '#FFF1F2',
+    textSecondary: '#FECDD3',
+    textMuted: '#FDA4AF',
+    cardBg: 'rgba(32, 20, 38, 0.75)',
+    badgeBg: 'rgba(244, 63, 94, 0.15)',
+    badgeText: '#FDA4AF',
+  },
+  {
+    id: 'gamma-light',
+    name: 'Gamma Minimal (Pure Editorial White)',
+    category: 'light',
+    bg: '#F8F9FA',
+    surface: '#FFFFFF',
+    surfaceBorder: 'rgba(0, 0, 0, 0.08)',
+    primary: '#4F46E5',
+    primaryHover: '#4338CA',
+    accent: '#06B6D4',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    textMuted: '#94A3B8',
+    cardBg: '#FFFFFF',
+    badgeBg: 'rgba(79, 70, 229, 0.1)',
+    badgeText: '#4F46E5',
+  }
+];
+
+export const getTheme = (id: string): ThemeColors => {
+  return THEMES.find(t => t.id === id) || THEMES[0];
+};
