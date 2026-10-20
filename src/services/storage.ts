@@ -110,5 +110,19 @@ export const storageService = {
     } catch (err) {
       console.error('Failed to restore project:', err);
     }
+  },
+
+  rename(id: string, newTitle: string): void {
+    try {
+      const all = this.loadAll();
+      const target = all.find(d => d.id === id);
+      if (target) {
+        target.title = newTitle.trim();
+        target.updatedAt = new Date().toISOString();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+      }
+    } catch (err) {
+      console.error('Failed to rename project:', err);
+    }
   }
 };

@@ -3,7 +3,11 @@ import {
   DesignDocument, 
   SlidePage, 
   DocumentType, 
-  DesignElement 
+  DesignElement,
+  Collaborator,
+  SlideComment,
+  VersionHistoryItem,
+  AspectRatio
 } from './types/design';
 import { storageService } from './services/storage';
 import { STARTER_PITCH_DECK } from './services/templates';
@@ -19,6 +23,11 @@ import { CreateAiModal } from './components/CreateAiModal';
 import { PresentationModal } from './components/PresentationModal';
 import { ExportModal } from './components/ExportModal';
 import { SettingsModal } from './components/SettingsModal';
+import { ShareModal } from './components/ShareModal';
+import { CommentsDrawer } from './components/CommentsDrawer';
+import { CanvaElementsDrawer } from './components/CanvaElementsDrawer';
+import { CanvaFormattingBar } from './components/CanvaFormattingBar';
+import { VersionHistoryModal } from './components/VersionHistoryModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -40,11 +49,84 @@ export function App() {
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [isOutlineOpen, setIsOutlineOpen] = useState<boolean>(true);
 
-  // Modals
+  // Modals & Drawers
   const [isCreateAiOpen, setIsCreateAiOpen] = useState(false);
   const [isPresentationOpen, setIsPresentationOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isCommentsDrawerOpen, setIsCommentsDrawerOpen] = useState(false);
+  const [isElementsDrawerOpen, setIsElementsDrawerOpen] = useState(false);
+  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+
+  // Collaboration State
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([
+    {
+      id: 'col-1',
+      name: 'Moksh Jindal',
+      email: 'jindalmoksh2008@gmail.com',
+      avatar: 'M',
+      role: 'owner',
+      color: '#8B5CF6',
+      status: 'active',
+      lastSeen: 'Now',
+    },
+    {
+      id: 'col-2',
+      name: 'Elena Rostova',
+      email: 'elena@deepmind.com',
+      avatar: 'E',
+      role: 'editor',
+      color: '#06B6D4',
+      status: 'active',
+      lastSeen: 'Viewing Slide 2',
+    },
+    {
+      id: 'col-3',
+      name: 'Alex Rivera',
+      email: 'alex@sequoia.com',
+      avatar: 'A',
+      role: 'commenter',
+      color: '#10B981',
+      status: 'idle',
+      lastSeen: '8 mins ago',
+    },
+  ]);
+
+  // Real-time Comments State
+  const [comments, setComments] = useState<SlideComment[]>([
+    {
+      id: 'c-1',
+      slideId: currentDoc?.slides?.[0]?.id || 's1',
+      slideNumber: 1,
+      authorName: 'Alex Rivera',
+      authorAvatar: 'A',
+      authorColor: '#10B981',
+      content: 'The executive hook is magnetic! Can we make the TAM metric $85B instead of $75B?',
+      timestamp: '10 mins ago',
+      resolved: false,
+      replies: [
+        {
+          id: 'r-1',
+          authorName: 'Moksh Jindal',
+          authorAvatar: 'M',
+          content: 'Updated to $85B based on latest Tier-1 market report!',
+          timestamp: '5 mins ago',
+        }
+      ]
+    },
+    {
+      id: 'c-2',
+      slideId: currentDoc?.slides?.[1]?.id || 's2',
+      slideNumber: 2,
+      authorName: 'Elena Rostova',
+      authorAvatar: 'E',
+      authorColor: '#06B6D4',
+      content: 'Love the Bento grid on problem friction. Typography contrast is pristine.',
+      timestamp: '25 mins ago',
+      resolved: true,
+    }
+  ]);
 
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -220,28 +302,27 @@ export function App() {
     const cloned = storageService.duplicate(doc.id);
     if (cloned) {
       setDocuments(storageService.loadAll());
-      addToast({ 
-        title: 'Project duplicated', 
-        message: `Created "${cloned.title}"`,
-        type: 'success' 
-      });
+      addToast({ title: `Duplicated "${doc.title}"`, type: 'success' });
     }
   };
 
   const handleDeleteDocument = (id: string) => {
     const deleted = storageService.delete(id);
-    setDocuments(storageService.loadAll());
     if (deleted) {
+      const remaining = storageService.loadAll();
+      setDocuments(remaining);
+      if (currentDoc.id === id) {
+        setCurrentDoc(remaining[0] || STARTER_PITCH_DECK);
+      }
       addToast({
-        title: 'Project deleted',
-        message: `"${deleted.title}" was moved to trash`,
+        title: `Deleted "${deleted.title}"`,
         type: 'info',
         action: {
           label: 'Undo',
           onClick: () => {
             storageService.restore(deleted);
             setDocuments(storageService.loadAll());
-            addToast({ title: 'Project restored', type: 'success' });
+            addToast({ title: 'Restored project', type: 'success' });
           }
         }
       });
@@ -249,13 +330,11 @@ export function App() {
   };
 
   const handleRenameDocument = (id: string, newTitle: string) => {
-    const all = storageService.loadAll();
-    const doc = all.find(d => d.id === id);
-    if (doc) {
-      doc.title = newTitle;
-      storageService.save(doc);
-      setDocuments(storageService.loadAll());
-      addToast({ title: 'Renamed successfully', type: 'success' });
+    storageService.rename(id, newTitle);
+    const updated = storageService.loadAll();
+    setDocuments(updated);
+    if (currentDoc.id === id) {
+      setCurrentDoc({ ...currentDoc, title: newTitle });
     }
   };
 
@@ -263,67 +342,69 @@ export function App() {
     storageService.save(newDoc);
     setDocuments(storageService.loadAll());
     handleOpenDocument(newDoc);
-    addToast({ 
-      title: '✦ Deck generated with Claude!', 
-      message: `${newDoc.slides.length} cards structured and styled.`,
-      type: 'success' 
-    });
+    addToast({ title: `Generated "${newDoc.title}" with Claude!`, type: 'success' });
   };
 
   const handleUpdateCurrentSlide = (updatedSlide: SlidePage) => {
-    const updatedSlides = [...currentDoc.slides];
-    updatedSlides[activeSlideIndex] = updatedSlide;
-    const newDoc = { ...currentDoc, slides: updatedSlides, updatedAt: new Date().toISOString() };
-    pushDocState(newDoc);
+    const newSlides = [...currentDoc.slides];
+    newSlides[activeSlideIndex] = updatedSlide;
+    pushDocState({ ...currentDoc, slides: newSlides });
   };
 
-  const handleAddSlide = (category: SlidePage['category'] = 'solution') => {
+  const handleAddSlide = (categoryOrIndex?: SlidePage['category'] | number) => {
+    const isNum = typeof categoryOrIndex === 'number';
+    const targetIdx = isNum ? categoryOrIndex : activeSlideIndex + 1;
+    const cat = (!isNum && categoryOrIndex) || 'content';
+
     const newSlide: SlidePage = {
       id: `slide-${Date.now()}`,
-      title: 'New Card',
-      category,
-      layout: category === 'competition' ? 'table' : category === 'traction' ? 'bento-grid' : 'three-column',
-      badge: category.toUpperCase(),
-      headline: 'Click Here to Edit Your Headline',
-      subheadline: 'Enter supporting context and quantitative targets here.',
+      title: cat.toUpperCase(),
+      category: cat,
+      layout: 'hero',
+      badge: cat.toUpperCase(),
+      headline: 'New Topic Headline',
+      subheadline: 'Click in-place to edit this subtitle or use the Canva Elements dock.',
       elements: [
         {
           id: `el-${Date.now()}-1`,
           type: 'feature-card',
-          title: 'Strategic Superpower',
-          subtitle: 'Core Differentiator',
-          content: 'Autonomous neural workflows designed from the ground up for high-scale enterprise operations.',
-          tag: 'ADVANTAGE',
-          gridSpan: 'col-span-12 md:col-span-4'
+          title: 'Key Point',
+          content: 'Add high-impact descriptions or metrics here.',
+          tag: 'HIGHLIGHT',
+          gridSpan: 'col-span-12 md:col-span-6',
         },
         {
           id: `el-${Date.now()}-2`,
           type: 'stat-block',
-          statValue: '10x',
-          statLabel: 'Velocity Multiplier',
-          statChange: 'Verified customer benchmark',
-          gridSpan: 'col-span-12 md:col-span-4'
+          statValue: '$5.4M',
+          statLabel: 'Growth Metric',
+          statChange: '+45% YoY',
+          gridSpan: 'col-span-12 md:col-span-6',
         }
-      ],
-      notes: 'Presenter talking points'
+      ]
     };
 
     const newSlides = [...currentDoc.slides];
-    newSlides.splice(activeSlideIndex + 1, 0, newSlide);
-    const newDoc = { ...currentDoc, slides: newSlides };
-    pushDocState(newDoc);
-    setActiveSlideIndex(activeSlideIndex + 1);
+    newSlides.splice(targetIdx, 0, newSlide);
+
+    pushDocState({ ...currentDoc, slides: newSlides });
+    setActiveSlideIndex(targetIdx);
+    addToast({ title: 'Added new card to deck', type: 'success' });
   };
 
   const handleDuplicateSlide = (index: number) => {
     const target = currentDoc.slides[index];
+    if (!target) return;
+
     const clonedSlide: SlidePage = {
       ...JSON.parse(JSON.stringify(target)),
-      id: `slide-copy-${Date.now()}`,
+      id: `slide-${Date.now()}`,
       title: `${target.title} (Copy)`,
     };
+
     const newSlides = [...currentDoc.slides];
     newSlides.splice(index + 1, 0, clonedSlide);
+
     pushDocState({ ...currentDoc, slides: newSlides });
     setActiveSlideIndex(index + 1);
     addToast({ title: 'Card duplicated', type: 'success' });
@@ -331,21 +412,22 @@ export function App() {
 
   const handleDeleteSlide = (index: number) => {
     if (currentDoc.slides.length <= 1) {
-      addToast({ title: 'Cannot delete', message: 'A deck must contain at least one card.', type: 'error' });
+      addToast({ title: 'A presentation must have at least 1 card.', type: 'info' });
       return;
     }
+
     const newSlides = currentDoc.slides.filter((_, i) => i !== index);
-    const newIndex = Math.max(0, Math.min(index, newSlides.length - 1));
     pushDocState({ ...currentDoc, slides: newSlides });
-    setActiveSlideIndex(newIndex);
-    addToast({ title: 'Card deleted', type: 'info' });
+    setActiveSlideIndex(Math.max(0, index - 1));
+    addToast({ title: 'Card removed', type: 'info' });
   };
 
   const handleMoveSlide = (fromIndex: number, toIndex: number) => {
-    if (toIndex < 0 || toIndex >= currentDoc.slides.length) return;
+    if (fromIndex === toIndex) return;
     const newSlides = [...currentDoc.slides];
     const [moved] = newSlides.splice(fromIndex, 1);
     newSlides.splice(toIndex, 0, moved);
+
     pushDocState({ ...currentDoc, slides: newSlides });
     setActiveSlideIndex(toIndex);
   };
@@ -383,6 +465,232 @@ export function App() {
     const [moved] = newElements.splice(idx, 1);
     newElements.splice(targetIdx, 0, moved);
     handleUpdateCurrentSlide({ ...currentSlide, elements: newElements });
+  };
+
+  // Canva Insert Element handler
+  const handleAddElement = (newEl: DesignElement) => {
+    if (!currentSlide) return;
+    const updatedElements = [...(currentSlide.elements || []), newEl];
+    handleUpdateCurrentSlide({ ...currentSlide, elements: updatedElements });
+    addToast({ title: `Added ${newEl.type} to current slide`, type: 'success' });
+  };
+
+  // Canva Insert Slide Template handler
+  const handleAddSlideLayout = (layoutType: string) => {
+    const archetypeMap: Record<string, { badge: string; headline: string; elements: DesignElement[] }> = {
+      problem: {
+        badge: 'PROBLEM & FRICTION',
+        headline: '$42B Burned by Legacy Infrastructure Each Year',
+        elements: [
+          {
+            id: `el-${Date.now()}-1`,
+            type: 'stat-block',
+            statValue: '$42B',
+            statLabel: 'Annual Friction Loss',
+            statChange: 'Critical bottleneck',
+            gridSpan: 'col-span-12 md:col-span-4',
+          },
+          {
+            id: `el-${Date.now()}-2`,
+            type: 'feature-card',
+            title: 'Siloed Systems',
+            content: 'Legacy enterprise databases fail to coordinate across high-frequency operations.',
+            tag: 'BOTTLENECK',
+            gridSpan: 'col-span-12 md:col-span-8',
+          }
+        ]
+      },
+      solution: {
+        badge: 'AUTONOMOUS SOLUTION',
+        headline: 'Agentic Intelligence That Self-Heals in Real Time',
+        elements: [
+          {
+            id: `el-${Date.now()}-1`,
+            type: 'feature-card',
+            title: '01 // Autonomous Routing',
+            content: 'Multi-agent orchestration executing in <80ms with cryptographic proof of correctness.',
+            tag: 'CORE ENGINE',
+            gridSpan: 'col-span-12 md:col-span-6',
+          },
+          {
+            id: `el-${Date.now()}-2`,
+            type: 'feature-card',
+            title: '02 // SOC-2 Type II',
+            content: 'Enterprise auditability with end-to-end telemetry and zero data leakage.',
+            tag: 'SECURITY',
+            gridSpan: 'col-span-12 md:col-span-6',
+          }
+        ]
+      },
+      traction: {
+        badge: 'TRACTION & METRICS',
+        headline: 'Compounding Revenue With 154% Net Dollar Retention',
+        elements: [
+          {
+            id: `el-${Date.now()}-1`,
+            type: 'stat-block',
+            statValue: '$1.8M',
+            statLabel: 'Current ARR',
+            statChange: '+280% YoY',
+            gridSpan: 'col-span-12 md:col-span-4',
+          },
+          {
+            id: `el-${Date.now()}-2`,
+            type: 'stat-block',
+            statValue: '154%',
+            statLabel: 'Net Dollar Retention',
+            statChange: 'Expansion-led',
+            gridSpan: 'col-span-12 md:col-span-4',
+          },
+          {
+            id: `el-${Date.now()}-3`,
+            type: 'stat-block',
+            statValue: '42',
+            statLabel: 'Tier-1 Enterprise Pilots',
+            statChange: 'Fortune 500 roster',
+            gridSpan: 'col-span-12 md:col-span-4',
+          }
+        ]
+      },
+      team: {
+        badge: 'FOUNDING LEADERSHIP',
+        headline: 'Frontier AI Researchers & Operators From DeepMind and Flexport',
+        elements: [
+          {
+            id: `el-${Date.now()}-1`,
+            type: 'team-card',
+            title: 'Alex Mercer',
+            subtitle: 'CEO & Co-Founder',
+            content: 'Ex-DeepMind Research Lead. PhD in Reinforcement Learning from Stanford.',
+            tag: 'FOUNDER',
+            gridSpan: 'col-span-12 md:col-span-6',
+          },
+          {
+            id: `el-${Date.now()}-2`,
+            type: 'team-card',
+            title: 'Elena Rostova',
+            subtitle: 'CTO & Co-Founder',
+            content: 'Former VP Engineering at Flexport. Architected real-time routing handling $6B freight.',
+            tag: 'FOUNDER',
+            gridSpan: 'col-span-12 md:col-span-6',
+          }
+        ]
+      },
+      closing: {
+        badge: 'SEED ROUND // 2026',
+        headline: 'Raising $4.0M Seed to Accelerate Autonomous Global Deployment',
+        elements: [
+          {
+            id: `el-${Date.now()}-1`,
+            type: 'stat-block',
+            statValue: '$4.0M',
+            statLabel: 'Target Seed Round',
+            statChange: '$2.5M committed',
+            gridSpan: 'col-span-12 md:col-span-6',
+          },
+          {
+            id: `el-${Date.now()}-2`,
+            type: 'bullet-list',
+            title: 'Primary Capital Allocation',
+            items: [
+              'Scale multi-agent inference cluster to 10M events/day',
+              'Expand Tier-1 enterprise sales across North America & Europe',
+              'Maintain 18-month runway to reach $5M ARR Series A milestone'
+            ],
+            gridSpan: 'col-span-12 md:col-span-6',
+          }
+        ]
+      }
+    };
+
+    const arch = archetypeMap[layoutType] || archetypeMap.problem;
+    const newSlide: SlidePage = {
+      id: `slide-${Date.now()}`,
+      title: layoutType.toUpperCase(),
+      category: layoutType as any,
+      layout: 'hero',
+      badge: arch.badge,
+      headline: arch.headline,
+      subheadline: 'High-contrast executive layout with verified benchmark typography.',
+      elements: arch.elements,
+    };
+
+    const targetIdx = activeSlideIndex + 1;
+    const newSlides = [...currentDoc.slides];
+    newSlides.splice(targetIdx, 0, newSlide);
+
+    pushDocState({ ...currentDoc, slides: newSlides });
+    setActiveSlideIndex(targetIdx);
+    setIsElementsDrawerOpen(false);
+    addToast({ title: `Added "${layoutType}" slide template!`, type: 'success' });
+  };
+
+  // Device Toggle
+  const handleToggleDeviceView = () => {
+    const nextRatio: AspectRatio = currentDoc.aspectRatio === '9:16' ? '16:9' : '9:16';
+    pushDocState({ ...currentDoc, aspectRatio: nextRatio });
+    addToast({ title: `Switched to ${nextRatio === '9:16' ? 'Mobile View (9:16)' : 'Desktop (16:9)'}`, type: 'info' });
+  };
+
+  // Collaborator Handlers
+  const handleAddCollaborator = (col: Omit<Collaborator, 'id'>) => {
+    const newCol: Collaborator = { ...col, id: `col-${Date.now()}` };
+    setCollaborators([...collaborators, newCol]);
+  };
+
+  const handleRemoveCollaborator = (id: string) => {
+    setCollaborators(collaborators.filter(c => c.id !== id));
+    addToast({ title: 'Collaborator access revoked', type: 'info' });
+  };
+
+  // Comment Handlers
+  const handleAddComment = (content: string, slideId: string, slideNumber: number) => {
+    const newComment: SlideComment = {
+      id: `comm-${Date.now()}`,
+      slideId,
+      slideNumber,
+      authorName: 'Moksh Jindal',
+      authorAvatar: 'M',
+      authorColor: '#8B5CF6',
+      content,
+      timestamp: 'Just now',
+      resolved: false,
+    };
+    setComments([newComment, ...comments]);
+    addToast({ title: `Comment posted on Slide ${slideNumber}`, type: 'success' });
+  };
+
+  const handleAddReply = (commentId: string, replyContent: string) => {
+    const updated = comments.map(c => {
+      if (c.id === commentId) {
+        const replies = c.replies || [];
+        return {
+          ...c,
+          replies: [
+            ...replies,
+            {
+              id: `rep-${Date.now()}`,
+              authorName: 'Moksh Jindal',
+              authorAvatar: 'M',
+              content: replyContent,
+              timestamp: 'Just now',
+            }
+          ]
+        };
+      }
+      return c;
+    });
+    setComments(updated);
+    addToast({ title: 'Reply sent', type: 'success' });
+  };
+
+  const handleToggleResolveComment = (commentId: string) => {
+    setComments(comments.map(c => c.id === commentId ? { ...c, resolved: !c.resolved } : c));
+  };
+
+  const handleDeleteComment = (commentId: string) => {
+    setComments(comments.filter(c => c.id !== commentId));
+    addToast({ title: 'Comment deleted', type: 'info' });
   };
 
   // Keyboard navigation
@@ -447,7 +755,9 @@ export function App() {
             onStartPresentation={() => setIsPresentationOpen(true)}
             onOpenExportModal={() => setIsExportOpen(true)}
             onOpenSettingsModal={() => setIsSettingsOpen(true)}
+            onOpenShareModal={() => setIsShareModalOpen(true)}
             onBackToHome={() => setCurrentView('home')}
+            collaborators={collaborators}
           />
 
           <div className="flex-1 flex overflow-hidden relative">
@@ -468,9 +778,49 @@ export function App() {
 
             {/* Main Center Viewport */}
             <div 
-              className="flex-1 flex flex-col items-center justify-between overflow-y-auto px-4 sm:px-8 py-6 relative"
+              className="flex-1 flex flex-col items-center justify-between overflow-y-auto px-4 sm:px-8 py-4 relative"
               onClick={() => setSelectedElementId(null)}
             >
+              {/* Canva Top Formatting Bar */}
+              {!isBrochure && (
+                <CanvaFormattingBar
+                  onOpenElementsDrawer={() => setIsElementsDrawerOpen(true)}
+                  onOpenCommentsDrawer={() => setIsCommentsDrawerOpen(true)}
+                  onOpenVersionHistory={() => setIsVersionHistoryOpen(true)}
+                  aspectRatio={currentDoc.aspectRatio}
+                  onToggleDeviceView={handleToggleDeviceView}
+                  fontFamily={currentDoc.fontFamily || 'display'}
+                  onChangeFontFamily={(font) => pushDocState({ ...currentDoc, fontFamily: font })}
+                  onQuickAddStat={() => handleAddElement({
+                    id: `el-stat-${Date.now()}`,
+                    type: 'stat-block',
+                    statValue: '$18.4M',
+                    statLabel: 'Total Addressable Market',
+                    statChange: '+34% CAGR',
+                    gridSpan: 'col-span-12 md:col-span-4',
+                  })}
+                  onQuickAddFeature={() => handleAddElement({
+                    id: `el-feat-${Date.now()}`,
+                    type: 'feature-card',
+                    title: 'New Strategic Differentiator',
+                    subtitle: 'Architecture Foundation',
+                    content: 'Click here to describe the technology moat or core customer benefit.',
+                    tag: 'CAPABILITY',
+                    gridSpan: 'col-span-12 md:col-span-6',
+                  })}
+                  onQuickAddQuote={() => handleAddElement({
+                    id: `el-quote-${Date.now()}`,
+                    type: 'quote',
+                    content: 'Prearn standardizes execution with unprecedented precision.',
+                    author: 'Elena Rostova',
+                    role: 'Managing Director, Apex Capital',
+                    gridSpan: 'col-span-12 md:col-span-6',
+                  })}
+                  commentsCount={comments.filter(c => !c.resolved).length}
+                  collaborators={collaborators}
+                />
+              )}
+
               {!isBrochure && (
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full gamma-glass text-xs text-neutral-300 shadow-md mb-4 z-20">
                   <button
@@ -512,7 +862,7 @@ export function App() {
                     onSelectElement={setSelectedElementId}
                   />
                 ) : (
-                  <div className="w-full max-w-4xl">
+                  <div className={`w-full transition-all duration-300 ${currentDoc.aspectRatio === '9:16' ? 'max-w-sm' : 'max-w-4xl'}`}>
                     <GammaCard
                       slide={currentSlide}
                       theme={activeTheme}
@@ -551,6 +901,27 @@ export function App() {
                 setActiveSlideIndex(newSlides.length - 1);
               }}
               activeThemeId={currentDoc.themeId}
+            />
+
+            {/* Canva Elements Left Drawer */}
+            <CanvaElementsDrawer
+              isOpen={isElementsDrawerOpen}
+              onClose={() => setIsElementsDrawerOpen(false)}
+              onAddElement={handleAddElement}
+              onAddSlideLayout={handleAddSlideLayout}
+            />
+
+            {/* Slide Comments Right Drawer */}
+            <CommentsDrawer
+              isOpen={isCommentsDrawerOpen}
+              onClose={() => setIsCommentsDrawerOpen(false)}
+              comments={comments}
+              currentSlideIndex={activeSlideIndex}
+              currentSlideId={currentSlide?.id || 's1'}
+              onAddComment={handleAddComment}
+              onAddReply={handleAddReply}
+              onToggleResolve={handleToggleResolveComment}
+              onDeleteComment={handleDeleteComment}
             />
           </div>
         </div>
@@ -591,6 +962,31 @@ export function App() {
       {isSettingsOpen && (
         <SettingsModal onClose={() => setIsSettingsOpen(false)} />
       )}
+
+      {/* Share & Collaboration Modal */}
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        documentTitle={currentDoc.title}
+        documentId={currentDoc.id}
+        collaborators={collaborators}
+        onAddCollaborator={handleAddCollaborator}
+        onRemoveCollaborator={handleRemoveCollaborator}
+        onShowToast={(msg) => addToast({ title: msg, type: 'success' })}
+      />
+
+      {/* Version History Modal */}
+      <VersionHistoryModal
+        isOpen={isVersionHistoryOpen}
+        onClose={() => setIsVersionHistoryOpen(false)}
+        versions={currentDoc.versions || []}
+        currentDoc={currentDoc}
+        onRestoreVersion={(doc) => {
+          pushDocState(doc);
+          setActiveSlideIndex(0);
+          addToast({ title: 'Restored previous version', type: 'success' });
+        }}
+      />
     </>
   );
 }

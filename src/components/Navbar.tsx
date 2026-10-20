@@ -9,9 +9,10 @@ import {
   Bot,
   Crown,
   Wand2,
-  Check
+  Check,
+  Users
 } from 'lucide-react';
-import { DesignDocument, DocumentType } from '../types/design';
+import { DesignDocument, DocumentType, Collaborator } from '../types/design';
 import { THEMES } from '../services/themes';
 import { AVAILABLE_MODELS, getStoredModel, setStoredModel } from '../services/claude';
 import { InlineText } from './InlineText';
@@ -24,7 +25,9 @@ interface NavbarProps {
   onStartPresentation: () => void;
   onOpenExportModal: () => void;
   onOpenSettingsModal: () => void;
+  onOpenShareModal: () => void;
   onBackToHome: () => void;
+  collaborators?: Collaborator[];
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -35,7 +38,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onStartPresentation,
   onOpenExportModal,
   onOpenSettingsModal,
+  onOpenShareModal,
   onBackToHome,
+  collaborators = [],
 }) => {
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showTypeMenu, setShowTypeMenu] = useState(false);
@@ -216,8 +221,38 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* Right: Presentation, Export, Settings */}
+      {/* Right: Presence, Share, Presentation, Export, Settings */}
       <div className="flex items-center gap-2">
+        {/* Collaborators Avatar Stack */}
+        {collaborators.length > 0 && (
+          <div className="flex items-center -space-x-1.5 mr-1 hidden sm:flex">
+            {collaborators.slice(0, 3).map((col) => (
+              <div
+                key={col.id}
+                className="w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] text-white border-2 border-[#090A10] relative shadow-sm cursor-pointer"
+                style={{ backgroundColor: col.color }}
+                title={`${col.name} (${col.role}) - ${col.status}`}
+                onClick={onOpenShareModal}
+              >
+                {col.avatar}
+                {col.status === 'active' && (
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-[#090A10]" />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Canva-Grade Share Button */}
+        <button
+          onClick={onOpenShareModal}
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs transition-all shadow-gamma-glow hover:scale-[1.02] active:scale-[0.98]"
+          title="Share presentation with collaborators"
+        >
+          <Users className="w-3.5 h-3.5" />
+          <span>Share</span>
+        </button>
+
         <button
           onClick={onStartPresentation}
           className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/15 text-white font-medium transition-all"
@@ -229,10 +264,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         <button
           onClick={onOpenExportModal}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs transition-all shadow-gamma-glow"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold text-xs transition-all"
         >
           <Download className="w-3.5 h-3.5" />
-          <span>Export</span>
+          <span className="hidden sm:inline">Export</span>
         </button>
 
         <button

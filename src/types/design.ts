@@ -1,6 +1,6 @@
 export type DocumentType = 'pitch-deck' | 'brochure' | 'one-pager' | 'flyer';
 
-export type AspectRatio = '16:9' | '4:3' | 'a4-portrait' | 'a4-landscape' | 'trifold';
+export type AspectRatio = '16:9' | '4:3' | 'a4-portrait' | 'a4-landscape' | 'trifold' | '9:16';
 
 export interface ThemeColors {
   id: string;
@@ -34,6 +34,7 @@ export interface DesignElement {
     | 'team-card' 
     | 'quote' 
     | 'cta-button'
+    | 'image-card'
     | 'custom-html';
   content?: string;
   title?: string;
@@ -42,6 +43,8 @@ export interface DesignElement {
   statValue?: string;
   statLabel?: string;
   statChange?: string;
+  imageUrl?: string;
+  imageAlt?: string;
   items?: string[];
   columns?: string[];
   rows?: { cells: string[] }[];
@@ -79,6 +82,45 @@ export interface SlidePage {
   notes?: string;
 }
 
+export interface Collaborator {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+  role: 'owner' | 'editor' | 'commenter' | 'viewer';
+  color: string;
+  status: 'active' | 'idle' | 'offline';
+  lastSeen?: string;
+}
+
+export interface SlideComment {
+  id: string;
+  slideId: string;
+  slideNumber: number;
+  elementId?: string;
+  authorName: string;
+  authorAvatar: string;
+  authorColor: string;
+  content: string;
+  timestamp: string;
+  resolved: boolean;
+  replies?: {
+    id: string;
+    authorName: string;
+    authorAvatar: string;
+    content: string;
+    timestamp: string;
+  }[];
+}
+
+export interface VersionHistoryItem {
+  id: string;
+  timestamp: string;
+  authorName: string;
+  summary: string;
+  docSnapshot: DesignDocument;
+}
+
 export interface DesignDocument {
   id: string;
   title: string;
@@ -88,6 +130,10 @@ export interface DesignDocument {
   themeId: string;
   fontFamily: 'sans' | 'serif' | 'display' | 'mono';
   slides: SlidePage[];
+  collaborators?: Collaborator[];
+  comments?: SlideComment[];
+  versions?: VersionHistoryItem[];
+  isPublic?: boolean;
   createdAt: string;
   updatedAt: string;
 }

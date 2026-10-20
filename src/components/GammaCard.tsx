@@ -438,6 +438,43 @@ export const GammaCard: React.FC<GammaCardProps> = ({
                   </div>
                 )}
 
+                {/* IMAGE CARD (Canva / Unsplash Stock photo) */}
+                {el.type === 'image-card' && (
+                  <div className="flex flex-col justify-between h-full space-y-2.5">
+                    <div className="relative w-full h-44 rounded-xl overflow-hidden group/img">
+                      <img
+                        src={el.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80'}
+                        alt={el.imageAlt || 'Presentation visual'}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
+                      {el.tag && (
+                        <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-black/70 backdrop-blur-md text-white border border-white/10 uppercase">
+                          {el.tag}
+                        </span>
+                      )}
+                    </div>
+                    {el.title && (
+                      <h4 className="text-sm font-bold text-white tracking-tight">
+                        <InlineText
+                          value={el.title}
+                          onChange={(val) => updateElement(el.id, { title: val })}
+                          as="h4"
+                        />
+                      </h4>
+                    )}
+                    {el.content && (
+                      <p className="text-xs text-neutral-400 leading-relaxed">
+                        <InlineText
+                          value={el.content}
+                          onChange={(val) => updateElement(el.id, { content: val })}
+                          as="p"
+                        />
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* QUOTE / TESTIMONIAL CARD */}
                 {el.type === 'quote' && (
                   <div className="flex flex-col justify-between h-full py-2">
