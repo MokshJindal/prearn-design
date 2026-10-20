@@ -24,6 +24,8 @@ interface CardOutlineProps {
   isOpen: boolean;
   onToggle: () => void;
   theme: ThemeColors;
+  onAiAddNextSlide?: () => void;
+  isAiAddingNext?: boolean;
 }
 
 export const CardOutline: React.FC<CardOutlineProps> = ({
@@ -37,6 +39,8 @@ export const CardOutline: React.FC<CardOutlineProps> = ({
   isOpen,
   onToggle,
   theme,
+  onAiAddNextSlide,
+  isAiAddingNext = false,
 }) => {
   if (!isOpen) {
     return (
@@ -153,14 +157,25 @@ export const CardOutline: React.FC<CardOutlineProps> = ({
         })}
       </div>
 
-      {/* Bottom: Add Card Button */}
-      <div className="p-2.5 border-t border-white/5 bg-[#0C0D12]">
+      {/* Bottom: Add Card Actions */}
+      <div className="p-2.5 border-t border-white/5 bg-[#0C0D12] space-y-1.5">
+        {onAiAddNextSlide && (
+          <button
+            onClick={onAiAddNextSlide}
+            disabled={isAiAddingNext}
+            className="w-full py-2 px-3 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 hover:text-white font-medium text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+            title="Generate the next sequential slide with Claude AI"
+          >
+            <Sparkles className={`w-3.5 h-3.5 text-purple-400 ${isAiAddingNext ? 'animate-spin' : ''}`} />
+            <span>✦ AI Next Card</span>
+          </button>
+        )}
         <button
           onClick={() => onAddSlide('solution')}
           className="w-full py-2 px-3 rounded-xl border border-dashed border-white/15 hover:border-purple-500/50 hover:bg-purple-500/5 text-neutral-400 hover:text-white font-medium text-xs transition-all flex items-center justify-center gap-2 group"
         >
           <Plus className="w-3.5 h-3.5 text-neutral-400 group-hover:text-purple-400 group-hover:scale-110 transition-transform" />
-          <span>Add New Card</span>
+          <span>Add Blank Card</span>
         </button>
       </div>
     </div>

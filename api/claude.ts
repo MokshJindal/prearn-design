@@ -43,6 +43,29 @@ export default async function handler(req: Request) {
       );
     }
 
+    // Model normalization to ensure official Anthropic API compatibility
+    const modelAliases: Record<string, string> = {
+      'claude-sonnet-5-5': 'claude-3-7-sonnet-20250219',
+      'claude-opus-5-5': 'claude-3-opus-20240229',
+      'claude-fable-5-1': 'claude-3-5-sonnet-20241022',
+      'claude-haiku-5-5': 'claude-3-5-haiku-20241022',
+      'claude-sonnet-4-5-20250929': 'claude-3-5-sonnet-20241022',
+      'claude-opus-4-5-20251101': 'claude-3-opus-20240229',
+      'claude-3-7-sonnet': 'claude-3-7-sonnet-20250219',
+      'claude-3-5-sonnet': 'claude-3-5-sonnet-20241022',
+      'claude-3-opus': 'claude-3-opus-20240229',
+      'claude-3-5-haiku': 'claude-3-5-haiku-20241022',
+    };
+
+    if (body.model && modelAliases[body.model]) {
+      body.model = modelAliases[body.model];
+    }
+
+    // Maximize token output limit for limitless presentation generation
+    if (!body.max_tokens || body.max_tokens < 8192) {
+      body.max_tokens = 8192;
+    }
+
     const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {

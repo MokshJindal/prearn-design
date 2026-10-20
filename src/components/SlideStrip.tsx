@@ -19,6 +19,8 @@ interface SlideStripProps {
   onDeleteSlide: (index: number) => void;
   onMoveSlide: (fromIndex: number, toIndex: number) => void;
   theme: ThemeColors;
+  onAiAddNextSlide?: () => void;
+  isAiAddingNext?: boolean;
 }
 
 export const SlideStrip: React.FC<SlideStripProps> = ({
@@ -30,6 +32,8 @@ export const SlideStrip: React.FC<SlideStripProps> = ({
   onDeleteSlide,
   onMoveSlide,
   theme,
+  onAiAddNextSlide,
+  isAiAddingNext = false,
 }) => {
   const [showAddMenu, setShowAddMenu] = useState(false);
 
@@ -140,6 +144,26 @@ export const SlideStrip: React.FC<SlideStripProps> = ({
           );
         })}
       </div>
+
+      {/* AI Next Slide Button */}
+      {onAiAddNextSlide && (
+        <button
+          onClick={onAiAddNextSlide}
+          disabled={isAiAddingNext}
+          className="flex-shrink-0 w-32 h-20 rounded-xl bg-gradient-to-br from-purple-900/40 to-indigo-900/40 border border-purple-500/50 hover:border-purple-400 hover:from-purple-800/50 hover:to-indigo-800/50 transition-all flex flex-col items-center justify-center gap-1.5 text-purple-200 hover:text-white shadow-sm group disabled:opacity-50"
+          title="Limitless expansion: Generate the next logical slide with Claude AI"
+        >
+          {isAiAddingNext ? (
+            <Sparkles className="w-4 h-4 text-purple-400 animate-spin" />
+          ) : (
+            <Sparkles className="w-4 h-4 text-purple-400 group-hover:scale-110 group-hover:rotate-12 transition-all" />
+          )}
+          <div className="text-center leading-tight">
+            <span className="text-[11px] font-bold block">AI Next Slide</span>
+            <span className="text-[9px] text-purple-300 font-mono">Limitless ✦</span>
+          </div>
+        </button>
+      )}
 
       {/* Add New Slide Button with Template Popover */}
       <div className="relative flex-shrink-0">

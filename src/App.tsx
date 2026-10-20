@@ -12,6 +12,7 @@ import {
 import { storageService } from './services/storage';
 import { STARTER_PITCH_DECK } from './services/templates';
 import { getTheme } from './services/themes';
+import { generateNextSlideInDeck } from './services/claude';
 import { HomePage } from './components/HomePage';
 import { Navbar } from './components/Navbar';
 import { GammaCard } from './components/GammaCard';
@@ -58,6 +59,7 @@ export function App() {
   const [isCommentsDrawerOpen, setIsCommentsDrawerOpen] = useState(false);
   const [isElementsDrawerOpen, setIsElementsDrawerOpen] = useState(false);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+  const [isAiAddingNext, setIsAiAddingNext] = useState(false);
 
   // Collaboration State
   const [collaborators, setCollaborators] = useState<Collaborator[]>([
@@ -390,6 +392,25 @@ export function App() {
     pushDocState({ ...currentDoc, slides: newSlides });
     setActiveSlideIndex(targetIdx);
     addToast({ title: 'Added new card to deck', type: 'success' });
+  };
+
+  const handleAiAddNextSlide = async () => {
+    try {
+      setIsAiAddingNext(true);
+      addToast({ title: 'Claude is designing next sequential card...', type: 'info' });
+      const nextSlide = await generateNextSlideInDeck(currentDoc);
+      const targetIdx = activeSlideIndex + 1;
+      const newSlides = [...currentDoc.slides];
+      newSlides.splice(targetIdx, 0, nextSlide);
+      pushDocState({ ...currentDoc, slides: newSlides });
+      setActiveSlideIndex(targetIdx);
+      addToast({ title: `Added "${nextSlide.title}" with Claude!`, type: 'success' });
+    } catch (err: any) {
+      console.error('Failed to generate next card:', err);
+      addToast({ title: `AI error: ${err.message}`, type: 'error' });
+    } finally {
+      setIsAiAddingNext(false);
+    }
   };
 
   const handleDuplicateSlide = (index: number) => {
@@ -773,6 +794,8 @@ export function App() {
                 isOpen={isOutlineOpen}
                 onToggle={() => setIsOutlineOpen(!isOutlineOpen)}
                 theme={activeTheme}
+                onAiAddNextSlide={handleAiAddNextSlide}
+                isAiAddingNext={isAiAddingNext}
               />
             )}
 
@@ -816,6 +839,8 @@ export function App() {
                     role: 'Managing Director, Apex Capital',
                     gridSpan: 'col-span-12 md:col-span-6',
                   })}
+                  onAiAddNextSlide={handleAiAddNextSlide}
+                  isAiAddingNext={isAiAddingNext}
                   commentsCount={comments.filter(c => !c.resolved).length}
                   collaborators={collaborators}
                 />

@@ -27,6 +27,8 @@ interface CanvaFormattingBarProps {
   onQuickAddStat: () => void;
   onQuickAddFeature: () => void;
   onQuickAddQuote: () => void;
+  onAiAddNextSlide?: () => void;
+  isAiAddingNext?: boolean;
   commentsCount: number;
   collaborators: Collaborator[];
 }
@@ -42,6 +44,8 @@ export const CanvaFormattingBar: React.FC<CanvaFormattingBarProps> = ({
   onQuickAddStat,
   onQuickAddFeature,
   onQuickAddQuote,
+  onAiAddNextSlide,
+  isAiAddingNext = false,
   commentsCount,
   collaborators,
 }) => {
@@ -87,6 +91,18 @@ export const CanvaFormattingBar: React.FC<CanvaFormattingBarProps> = ({
             <Quote className="w-3 h-3 text-amber-400" />
             <span>+ Quote</span>
           </button>
+
+          {onAiAddNextSlide && (
+            <button
+              onClick={onAiAddNextSlide}
+              disabled={isAiAddingNext}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 hover:text-white border border-purple-500/30 transition-all font-medium disabled:opacity-50"
+              title="Limitless expansion: Generate next card with Claude"
+            >
+              <Sparkles className={`w-3 h-3 text-purple-400 ${isAiAddingNext ? 'animate-spin' : ''}`} />
+              <span>+ AI Next Card</span>
+            </button>
+          )}
         </div>
 
         <div className="h-4 w-px bg-white/10 hidden lg:block" />

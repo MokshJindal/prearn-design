@@ -14,6 +14,8 @@ import {
 import { 
   generateFullDesignDocument, 
   generateOrRewriteSlide, 
+  generateNextSlideInDeck,
+  expandDeckWithAI,
   refineTextWithClaude,
   AVAILABLE_MODELS, 
   getStoredModel, 
@@ -45,8 +47,41 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
   const [selectedDocType, setSelectedDocType] = useState<DocumentType>('pitch-deck');
   const [selectedModel, setSelectedModel] = useState(getStoredModel());
   const [statusMessage, setStatusMessage] = useState('');
+  const [targetCardCount, setTargetCardCount] = useState<number>(8);
+
+  const handleAiNextCard = async () => {
+    setIsLoading(true);
+    setStatusMessage('Synthesizing next sequential card with Claude...');
+    try {
+      const nextSlide = await generateNextSlideInDeck(currentDocument);
+      onAddGeneratedSlide(nextSlide);
+      setStatusMessage('✨ Next card appended to deck!');
+    } catch (err: any) {
+      alert(`AI Next Slide Error: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => setStatusMessage(''), 3000);
+    }
+  };
+
+  const handleAiExpandDeck = async () => {
+    setIsLoading(true);
+    setStatusMessage('Expanding deck with 3 deep-dive cards...');
+    try {
+      const newSlides = await expandDeckWithAI(currentDocument, 3, (msg) => setStatusMessage(msg));
+      newSlides.forEach(slide => onAddGeneratedSlide(slide));
+      setStatusMessage('✨ 3 new deep-dive cards added!');
+    } catch (err: any) {
+      alert(`AI Expand Error: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => setStatusMessage(''), 3000);
+    }
+  };
 
   const quickPills = [
+    { label: '✦ AI Next Card', isAction: true, onClick: handleAiNextCard },
+    { label: '⚡ Expand (+3 Cards)', isAction: true, onClick: handleAiExpandDeck },
     { label: '🪄 Rewrite Punchier', prompt: 'Rewrite this card to be executive, ultra-punchy, and concise.' },
     { label: '📊 Add Stat Counters', prompt: 'Convert this card to feature 3 massive high-impact quantitative stat counters.' },
     { label: '▦ Bento Grid', prompt: 'Redesign this card into a modern asymmetrical Bento Grid.' },
@@ -58,19 +93,21 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
     if (!finalPrompt.trim()) return;
 
     setIsLoading(true);
-    setStatusMessage('Claude 3.7 Sonnet is designing...');
+    setStatusMessage('Claude is designing...');
 
     try {
       if (mode === 'full-doc') {
-        setStatusMessage('Architecting full pitch deck...');
+        setStatusMessage(`Architecting ${targetCardCount} cards with multi-batch pipeline...`);
         const newDoc = await generateFullDesignDocument(
           finalPrompt,
           selectedDocType,
           activeThemeId,
-          selectedDocType === 'pitch-deck' ? '16:9' : 'a4-portrait'
+          selectedDocType === 'pitch-deck' ? '16:9' : 'a4-portrait',
+          targetCardCount,
+          (msg) => setStatusMessage(msg)
         );
         onReplaceDocument(newDoc);
-        setStatusMessage('✨ Complete deliverable created!');
+        setStatusMessage(`✨ ${newDoc.slides.length} cards generated!`);
         setPrompt('');
         setIsExpanded(false);
       } else {
@@ -97,12 +134,16 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
       {/* Quick Suggestion Pills (Gamma Style Floating Chips) */}
       {!isExpanded && (
         <div className="flex items-center gap-1.5 mb-2 overflow-x-auto max-w-full py-1 px-2 no-scrollbar animate-fadeIn">
-          {quickPills.map((pill, idx) => (
+          {quickPills.map((pill: any, idx) => (
             <button
               key={idx}
-              onClick={() => handleGenerate(pill.prompt)}
+              onClick={() => pill.isAction ? pill.onClick() : handleGenerate(pill.prompt)}
               disabled={isLoading}
-              className="flex-shrink-0 px-3 py-1 rounded-full gamma-glass hover:bg-white/10 border border-white/10 text-[11px] font-medium text-neutral-300 hover:text-white transition-all shadow-sm hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+              className={`flex-shrink-0 px-3 py-1 rounded-full border text-[11px] font-medium transition-all shadow-sm hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 ${
+                pill.isAction
+                  ? 'bg-purple-600/25 border-purple-500/50 text-purple-200 hover:bg-purple-600/40 hover:text-white'
+                  : 'gamma-glass hover:bg-white/10 border-white/10 text-neutral-300 hover:text-white'
+              }`}
             >
               {pill.label}
             </button>
@@ -112,9 +153,9 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
               setMode('full-doc');
               setIsExpanded(true);
             }}
-            className="flex-shrink-0 px-3 py-1 rounded-full bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-[11px] font-semibold text-purple-200 transition-all shadow-sm"
+            className="flex-shrink-0 px-3 py-1 rounded-full bg-gradient-to-r from-purple-600/40 to-indigo-600/40 hover:from-purple-600/60 hover:to-indigo-600/60 border border-purple-500/50 text-[11px] font-semibold text-purple-200 transition-all shadow-sm"
           >
-            ✦ Generate Full Deck
+            ✦ Limitless Generator
           </button>
         </div>
       )}
@@ -169,21 +210,40 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
             </div>
 
             {mode === 'full-doc' && (
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-neutral-400 font-mono text-[11px]">Format:</span>
-                {(['pitch-deck', 'brochure', 'one-pager', 'flyer'] as DocumentType[]).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setSelectedDocType(type)}
-                    className={`px-2.5 py-1 rounded-lg text-xs capitalize transition-colors ${
-                      selectedDocType === type
-                        ? 'bg-purple-600/30 border border-purple-500 text-purple-200 font-semibold'
-                        : 'border border-white/10 text-neutral-400 hover:text-white'
-                    }`}
-                  >
-                    {type.replace('-', ' ')}
-                  </button>
-                ))}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs overflow-x-auto">
+                  <span className="text-neutral-400 font-mono text-[11px]">Format:</span>
+                  {(['pitch-deck', 'brochure', 'one-pager', 'flyer'] as DocumentType[]).map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setSelectedDocType(type)}
+                      className={`px-2.5 py-1 rounded-lg text-xs capitalize transition-colors ${
+                        selectedDocType === type
+                          ? 'bg-purple-600/30 border border-purple-500 text-purple-200 font-semibold'
+                          : 'border border-white/10 text-neutral-400 hover:text-white'
+                      }`}
+                    >
+                      {type.replace('-', ' ')}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="text-neutral-400 font-mono text-[11px]">Cards:</span>
+                  {[5, 8, 12, 16, 20].map((cnt) => (
+                    <button
+                      key={cnt}
+                      onClick={() => setTargetCardCount(cnt)}
+                      className={`px-2 py-0.5 rounded-lg text-[11px] font-mono transition-colors ${
+                        targetCardCount === cnt
+                          ? 'bg-purple-600 text-white font-bold'
+                          : 'border border-white/10 text-neutral-400 hover:text-white'
+                      }`}
+                    >
+                      {cnt}
+                    </button>
+                  ))}
+                  <span className="text-[10px] text-purple-400 font-mono ml-auto">Multi-Batch Auto</span>
+                </div>
               </div>
             )}
 

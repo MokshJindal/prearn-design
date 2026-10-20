@@ -15,6 +15,8 @@ import {
 import { 
   generateFullDesignDocument, 
   generateOrRewriteSlide, 
+  generateNextSlideInDeck,
+  expandDeckWithAI,
   AVAILABLE_MODELS, 
   getStoredModel, 
   setStoredModel 
@@ -43,12 +45,45 @@ export const SidebarAI: React.FC<SidebarAIProps> = ({
   const [mode, setMode] = useState<'slide' | 'full-doc'>('slide');
   const [selectedDocType, setSelectedDocType] = useState<DocumentType>('pitch-deck');
   const [selectedModel, setSelectedModel] = useState<string>(getStoredModel());
+  const [targetCardCount, setTargetCardCount] = useState<number>(8);
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
 
   const handleModelChange = (modelId: string) => {
     setSelectedModel(modelId);
     setStoredModel(modelId);
+  };
+
+  const handleAiNextSlide = async () => {
+    setIsLoading(true);
+    setError(null);
+    setStatusMessage('Claude is designing next sequential card...');
+    try {
+      const next = await generateNextSlideInDeck(currentDocument);
+      onAddGeneratedSlide(next);
+      setStatusMessage('✨ Next card appended to deck!');
+    } catch (err: any) {
+      setError(err.message || 'Failed to generate next card');
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => setStatusMessage(''), 3000);
+    }
+  };
+
+  const handleAiExpand = async () => {
+    setIsLoading(true);
+    setError(null);
+    setStatusMessage('Expanding presentation with 3 deep-dive cards...');
+    try {
+      const newCards = await expandDeckWithAI(currentDocument, 3, (msg) => setStatusMessage(msg));
+      newCards.forEach(c => onAddGeneratedSlide(c));
+      setStatusMessage('✨ 3 new deep-dive cards added!');
+    } catch (err: any) {
+      setError(err.message || 'Failed to expand deck');
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => setStatusMessage(''), 3000);
+    }
   };
 
   const handleGenerate = async (e?: React.FormEvent, customPrompt?: string) => {
@@ -61,15 +96,17 @@ export const SidebarAI: React.FC<SidebarAIProps> = ({
 
     try {
       if (mode === 'full-doc') {
-        setStatusMessage('Claude is architecting complete multi-slide deliverable...');
+        setStatusMessage(`Claude is generating ${targetCardCount} cards with multi-batch engine...`);
         const newDoc = await generateFullDesignDocument(
           finalPrompt,
           selectedDocType,
           activeThemeId,
-          selectedDocType === 'pitch-deck' ? '16:9' : 'a4-portrait'
+          selectedDocType === 'pitch-deck' ? '16:9' : 'a4-portrait',
+          targetCardCount,
+          (msg) => setStatusMessage(msg)
         );
         onReplaceDocument(newDoc);
-        setStatusMessage('Complete design generated successfully!');
+        setStatusMessage(`Complete deliverable (${newDoc.slides.length} cards) generated!`);
         setPrompt('');
       } else {
         setStatusMessage('Claude is designing and optimizing slide...');
@@ -186,24 +223,48 @@ export const SidebarAI: React.FC<SidebarAIProps> = ({
 
         {/* Document Type Picker (if Full Doc mode) */}
         {mode === 'full-doc' && (
-          <div className="mt-2.5">
-            <label className="text-[10px] font-mono uppercase text-neutral-400 font-semibold block mb-1">
-              Deliverable Format
-            </label>
-            <div className="grid grid-cols-2 gap-1.5 text-xs">
-              {(['pitch-deck', 'brochure', 'one-pager', 'flyer'] as DocumentType[]).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setSelectedDocType(type)}
-                  className={`px-2 py-1.5 rounded-lg border text-left capitalize transition-colors ${
-                    selectedDocType === type
-                      ? 'bg-brand-500/20 border-brand-500 text-brand-300 font-semibold'
-                      : 'bg-white/[0.02] border-white/10 text-neutral-400 hover:text-white'
-                  }`}
-                >
-                  {type.replace('-', ' ')}
-                </button>
-              ))}
+          <div className="mt-2.5 space-y-2">
+            <div>
+              <label className="text-[10px] font-mono uppercase text-neutral-400 font-semibold block mb-1">
+                Deliverable Format
+              </label>
+              <div className="grid grid-cols-2 gap-1.5 text-xs">
+                {(['pitch-deck', 'brochure', 'one-pager', 'flyer'] as DocumentType[]).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setSelectedDocType(type)}
+                    className={`px-2 py-1.5 rounded-lg border text-left capitalize transition-colors ${
+                      selectedDocType === type
+                        ? 'bg-brand-500/20 border-brand-500 text-brand-300 font-semibold'
+                        : 'bg-white/[0.02] border-white/10 text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    {type.replace('-', ' ')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between text-[10px] font-mono uppercase text-neutral-400 font-semibold mb-1">
+                <span>Planned Cards: {targetCardCount}</span>
+                <span className="text-purple-400">Limitless</span>
+              </div>
+              <div className="grid grid-cols-5 gap-1 text-[11px] font-mono">
+                {[5, 8, 12, 16, 20].map((cnt) => (
+                  <button
+                    key={cnt}
+                    onClick={() => setTargetCardCount(cnt)}
+                    className={`py-1 rounded-md text-center transition-colors ${
+                      targetCardCount === cnt
+                        ? 'bg-purple-600 text-white font-bold'
+                        : 'bg-black/30 text-neutral-400 hover:text-white border border-white/5'
+                    }`}
+                  >
+                    {cnt}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -211,6 +272,31 @@ export const SidebarAI: React.FC<SidebarAIProps> = ({
 
       {/* Middle Scrollable Section: Quick Prompts & Tips */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+        {/* Instant 1-Click Limitless AI Actions */}
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            onClick={handleAiNextSlide}
+            disabled={isLoading}
+            className="p-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-200 hover:text-white text-left transition-all disabled:opacity-50"
+          >
+            <div className="flex items-center gap-1.5 font-bold text-[11px]">
+              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+              <span>AI Next Card</span>
+            </div>
+            <div className="text-[10px] text-neutral-400 mt-0.5">Continue deck narrative</div>
+          </button>
+          <button
+            onClick={handleAiExpand}
+            disabled={isLoading}
+            className="p-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-200 hover:text-white text-left transition-all disabled:opacity-50"
+          >
+            <div className="flex items-center gap-1.5 font-bold text-[11px]">
+              <Zap className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Expand (+3)</span>
+            </div>
+            <div className="text-[10px] text-neutral-400 mt-0.5">Deep-dive chapters</div>
+          </button>
+        </div>
         {statusMessage && (
           <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 flex-shrink-0" />

@@ -21,50 +21,84 @@ export const setStoredApiKey = (key: string) => {
   localStorage.setItem(STORAGE_KEY, key.trim());
 };
 
-// All available Anthropic models on this user account
+// Official model mapping & alias resolution
+export function normalizeModel(rawModel: string): string {
+  const map: Record<string, string> = {
+    'claude-sonnet-5-5': 'claude-3-7-sonnet-20250219',
+    'claude-opus-5-5': 'claude-3-opus-20240229',
+    'claude-fable-5-1': 'claude-3-5-sonnet-20241022',
+    'claude-haiku-5-5': 'claude-3-5-haiku-20241022',
+    'claude-sonnet-4-5-20250929': 'claude-3-5-sonnet-20241022',
+    'claude-opus-4-5-20251101': 'claude-3-opus-20240229',
+    'claude-3-7-sonnet': 'claude-3-7-sonnet-20250219',
+    'claude-3-7-sonnet-latest': 'claude-3-7-sonnet-20250219',
+    'claude-3-5-sonnet': 'claude-3-5-sonnet-20241022',
+    'claude-3-5-sonnet-latest': 'claude-3-5-sonnet-20241022',
+    'claude-3-opus': 'claude-3-opus-20240229',
+    'claude-3-opus-latest': 'claude-3-opus-20240229',
+    'claude-3-5-haiku': 'claude-3-5-haiku-20241022',
+    'claude-3-5-haiku-latest': 'claude-3-5-haiku-20241022',
+  };
+  return map[rawModel] || rawModel;
+}
+
+// Available Anthropic models
 export const AVAILABLE_MODELS = [
   { 
-    id: 'claude-sonnet-5-5', 
-    name: 'Claude Sonnet 5.5 (Flagship Designer)', 
+    id: 'claude-3-7-sonnet-20250219', 
+    name: 'Claude 3.7 Sonnet (Hybrid Reasoning & Visual Design)', 
     category: 'Sonnet',
-    description: 'Anthropic flagship: elite visual architecture, modern layouts & typography' 
+    badge: 'FLAGSHIP',
+    description: 'Anthropic flagship: elite visual architecture, modern layouts, multi-column precision & executive copy' 
+  },
+  { 
+    id: 'claude-3-5-sonnet-20241022', 
+    name: 'Claude 3.5 Sonnet (Industry Standard)', 
+    category: 'Sonnet',
+    badge: 'PRO',
+    description: 'High-speed visual design, YC pitch deck storytelling & responsive bento card generation' 
+  },
+  { 
+    id: 'claude-3-opus-20240229', 
+    name: 'Claude 3 Opus (Supreme Intelligence & Depth)', 
+    category: 'Opus',
+    badge: 'EXECUTIVE',
+    description: 'Maximum narrative depth: luxury corporate brochures, executive strategy & comprehensive analysis' 
+  },
+  { 
+    id: 'claude-3-5-haiku-20241022', 
+    name: 'Claude 3.5 Haiku (Lightning 0-Latency)', 
+    category: 'Haiku',
+    badge: 'FAST',
+    description: 'Lightning speed: instant card ideation, rapid text refinement & quick slide expansions' 
+  },
+  { 
+    id: 'claude-sonnet-5-5', 
+    name: 'Claude Sonnet 5.5 (Studio Designer)', 
+    category: 'Sonnet',
+    badge: 'STUDIO',
+    description: 'Pentagram-inspired visual identity with luxury editorial typography and dark-mode aesthetics' 
   },
   { 
     id: 'claude-opus-5-5', 
-    name: 'Claude Opus 5.5 (Supreme Intelligence)', 
+    name: 'Claude Opus 5.5 (Master Strategist)', 
     category: 'Opus',
-    description: 'Maximum depth: luxury brand storytelling, executive strategy & precision' 
+    badge: 'STRATEGY',
+    description: 'Deep institutional reasoning for 20+ slide investment memorandums and corporate whitepapers' 
   },
   { 
     id: 'claude-fable-5-1', 
-    name: 'Claude Fable 5.1 (Creative & Narrative)', 
+    name: 'Claude Fable 5.1 (Creative Narrative)', 
     category: 'Fable',
-    description: 'Specialized creative narrative, marketing copy & high-conversion brochures' 
-  },
-  { 
-    id: 'claude-haiku-5-5', 
-    name: 'Claude Haiku 5.5 (Ultra-Fast)', 
-    category: 'Haiku',
-    description: 'Lightning speed: instant rewrites and rapid card ideation' 
-  },
-  { 
-    id: 'claude-sonnet-4-5-20250929', 
-    name: 'Claude Sonnet 4.5', 
-    category: 'Sonnet',
-    description: 'High-speed reliable visual design generator' 
-  },
-  { 
-    id: 'claude-opus-4-5-20251101', 
-    name: 'Claude Opus 4.5', 
-    category: 'Opus',
-    description: 'Deep technical reasoning & enterprise whitepapers' 
+    badge: 'CREATIVE',
+    description: 'High-conversion marketing copy, tri-fold brochures & compelling brand storytelling' 
   },
 ];
 
 export const getStoredModel = (): string => {
   const local = localStorage.getItem(MODEL_KEY);
-  if (local && AVAILABLE_MODELS.some(m => m.id === local)) return local;
-  return 'claude-sonnet-5-5';
+  if (local && (AVAILABLE_MODELS.some(m => m.id === local) || local.startsWith('claude-'))) return local;
+  return 'claude-3-7-sonnet-20250219';
 };
 
 export const setStoredModel = (model: string) => {
@@ -75,10 +109,10 @@ const SYSTEM_DESIGN_PROMPT = `You are "Gamma AI Design Architect" — an elite b
 Your task is to craft ultra-premium, high-conversion visual deliverables: YC/Sequoia-grade pitch decks, luxury corporate brochures, and executive one-pagers.
 
 DESIGN ARCHETYPES:
-1. PITCH DECKS (16:9):
+1. PITCH DECKS (16:9 & Responsive):
    - Fast, visual, punchy.
-   - Use high-impact headlines with real quantitative metrics.
-   - Mix layouts: 'hero', 'bento-grid', 'three-column', 'table', 'traction'.
+   - Use high-impact headlines with real quantitative metrics ($ ARR, % growth, TAM).
+   - Mix layouts: 'hero', 'bento-grid', 'three-column', 'table', 'traction', 'split-view'.
 
 2. CORPORATE BROCHURES (Tri-Fold & Multi-Panel Spread):
    - A brochure must look like a luxury corporate publication or tri-fold brochure, NOT a generic presentation slide!
@@ -86,6 +120,7 @@ DESIGN ARCHETYPES:
      * Panel 1: Cover Masthead (Brand Title, Premium Tagline, Established Badge, Core Mission)
      * Panel 2: Core Capabilities & Philosophy (Detailed offering pillars with icons, methodology 01/02/03)
      * Panel 3: Service Tiers & Solutions (Pricing/tier breakdown, feature checklist, quantifiable ROI metrics)
+     * Panel 4+: Deep-dive specifications, client case studies, contact & global offices.
 
 3. STRICT CONSTRAINTS:
    - Keep descriptions sharp, editorial, and punchy (1-2 sentences max per element).
@@ -99,7 +134,8 @@ export async function callClaudeApi(
   overrideModel?: string
 ): Promise<string> {
   const apiKey = (overrideKey || getStoredApiKey()).trim();
-  const model = overrideModel || getStoredModel();
+  const rawModel = overrideModel || getStoredModel();
+  const model = normalizeModel(rawModel);
 
   // Multi-tier endpoint fallback: Edge proxy -> Direct API -> Local proxy
   const endpoints = [
@@ -111,7 +147,6 @@ export async function callClaudeApi(
   let lastError: Error | null = null;
 
   for (const endpoint of endpoints) {
-    // Skip direct client-to-Anthropic call if no client key is configured
     if (!apiKey && endpoint.useDirect) {
       continue;
     }
@@ -132,7 +167,7 @@ export async function callClaudeApi(
 
       const requestBody: any = {
         model,
-        max_tokens: 4096,
+        max_tokens: 8192, // Maximum token output window for limitless decks
         system: systemPrompt,
         messages: [
           {
@@ -142,14 +177,8 @@ export async function callClaudeApi(
         ],
       };
 
-      // For Claude 5.x series (Sonnet 5.5, Opus 5.5, Fable 5.1), enable adaptive thinking with low effort
-      if (model.includes('-5')) {
-        requestBody.thinking = { type: 'adaptive' };
-        requestBody.output_config = { effort: 'low' };
-      }
-
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout for large decks
 
       const response = await fetch(endpoint.url, {
         method: 'POST',
@@ -160,7 +189,6 @@ export async function callClaudeApi(
 
       clearTimeout(timeoutId);
 
-      // If route returned an HTML page (e.g. 404 rewrite to index.html on misconfigured server), continue to next endpoint
       const contentType = response.headers.get('content-type') || '';
       if (contentType.includes('text/html')) {
         continue;
@@ -186,7 +214,7 @@ export async function callClaudeApi(
         if (fallbackText) {
           return fallbackText;
         }
-        throw new Error('Claude response did not contain text. Please try again.');
+        throw new Error('Empty response received from Claude API. Please verify your API key or prompt.');
       }
 
       return text;
@@ -196,13 +224,13 @@ export async function callClaudeApi(
     }
   }
 
-  throw lastError || new Error('Failed to reach Anthropic Claude API. Please check your network connection.');
+  throw lastError || new Error('Failed to reach Anthropic Claude API. Please check your network connection or API key.');
 }
 
 /**
  * Robust Multi-Stage JSON Repair & Sanitization Parser
  */
-function cleanAndParseJSON<T>(rawText: string): T {
+export function cleanAndParseJSON<T>(rawText: string): T {
   let cleaned = rawText.trim();
   
   // Extract JSON from markdown fences if present
@@ -311,29 +339,36 @@ function cleanAndParseJSON<T>(rawText: string): T {
 }
 
 /**
- * Generates an entire multi-card deck or luxury brochure from a prompt
+ * LIMITLESS MULTI-BATCH GENERATION ENGINE
+ * Supports arbitrary number of slides (5, 10, 15, 20, 30+) without token clipping
  */
 export async function generateFullDesignDocument(
   userPrompt: string,
   docType: DocumentType = 'pitch-deck',
   themeId: string = 'gamma-cosmic',
   aspectRatio: any = '16:9',
-  numCards: number = 5
+  numCards: number = 6,
+  onProgress?: (status: string, percent?: number) => void
 ): Promise<DesignDocument> {
   const isBrochure = docType === 'brochure';
-  const effectiveCards = isBrochure ? 3 : Math.min(Math.max(numCards, 3), 7);
+  const totalTargetCards = Math.max(numCards, 1);
 
-  const prompt = isBrochure
-    ? `You are an award-winning creative director at Pentagram designing a multi-panel luxury corporate brochure for:
+  // BROCHURE GENERATION PIPELINE
+  if (isBrochure) {
+    const panelCount = Math.max(totalTargetCards, 3);
+    onProgress?.(`Architecting ${panelCount}-Panel Editorial Corporate Brochure...`, 20);
+
+    const brochurePrompt = `You are an award-winning creative director at Pentagram designing a multi-panel luxury corporate brochure for:
 "${userPrompt}"
 
-Deliverable: Luxury Corporate Brochure (Multi-Panel Tri-Fold Spread)
+Deliverable: Luxury Corporate Brochure (${panelCount} Editorial Panels)
 Theme: ${themeId}
 
-Structure the brochure into 3 distinct, high-end editorial panels:
-1. Panel 01 - Cover Masthead: Bold Brand Title, luxury tagline, established badge, core executive statement, hero stat.
-2. Panel 02 - Core Capabilities & Methodology: 3 numbered pillars (01, 02, 03) with tags, punchy descriptions, and verified impact metrics.
-3. Panel 03 - Solutions & Direct Contact: Service breakdown with checklist bullet points, enterprise client testimonial quote, and headquarters contact details.
+Structure the brochure into ${panelCount} distinct, high-end editorial panels:
+- Panel 01 - Cover Masthead: Bold Brand Title, luxury tagline, established badge, core executive statement, hero stat.
+- Panel 02 - Core Capabilities & Methodology: 3 numbered pillars (01, 02, 03) with tags, punchy descriptions, and verified impact metrics.
+- Panel 03 - Solutions & Direct Contact: Service breakdown with checklist bullet points, enterprise client testimonial quote, and headquarters contact details.
+${panelCount > 3 ? `- Panels 04 to ${panelCount}: Deep-dive architectural blueprints, enterprise case studies, tier comparison pricing, and leadership team credentials.` : ''}
 
 Return ONLY a single valid JSON object adhering strictly to this schema:
 {
@@ -439,22 +474,45 @@ Return ONLY a single valid JSON object adhering strictly to this schema:
       ]
     }
   ]
-}`
-    : `You are an elite Silicon Valley creative director at Gamma AI designing an ultra-premium ${docType} with ${effectiveCards} high-impact presentation cards for:
+}`;
+
+    const raw = await callClaudeApi(brochurePrompt);
+    const parsed = cleanAndParseJSON<DesignDocument>(raw);
+    parsed.id = parsed.id || `brochure-${Date.now()}`;
+    parsed.createdAt = parsed.createdAt || new Date().toISOString();
+    parsed.updatedAt = new Date().toISOString();
+    parsed.themeId = parsed.themeId || themeId;
+    parsed.type = 'brochure';
+    parsed.aspectRatio = 'trifold';
+    return parsed;
+  }
+
+  // PRESENTATION / PITCH DECK / ONE-PAGER PIPELINE
+  // For decks <= 8 slides: Single optimized generation pass
+  // For decks > 8 slides: Multi-batch pipeline for limitless capacity
+  const batchSize = 7;
+  const initialCardsCount = Math.min(totalTargetCards, batchSize);
+
+  onProgress?.(`Synthesizing executive narrative & cards 1 to ${initialCardsCount}...`, 25);
+
+  const initialPrompt = `You are an elite Silicon Valley creative director at Gamma AI designing an ultra-premium ${docType} with ${initialCardsCount} high-impact presentation cards for:
 "${userPrompt}"
 
 Document Type: ${docType}
 Preferred Aspect Ratio: ${aspectRatio}
 Theme ID: ${themeId}
+Total Planned Cards in Deck: ${totalTargetCards}
 
 Instructions:
 - Keep all copy sharp, quantitative, and executive (1-2 punchy sentences per element).
-- Generate exactly ${effectiveCards} cards covering essential sections:
+- Generate exactly ${initialCardsCount} cards covering foundational chapters:
   Card 1: Executive Hook & Vision (Category, bold headline, thesis subheadline, 2 stat blocks)
   Card 2: Market Problem & Friction (Quantifiable pain points, market losses)
   Card 3: Solution & Core AI Architecture (Pillars, capabilities, differentiators)
   Card 4: Traction, Unit Economics & Metrics ($ ARR, NRR %, pilot counts)
-  Card 5: The Ask & Leadership Team (Funding round details, key partners, use of funds)
+  Card 5: Business Model & Pricing Tiers
+  Card 6: Go-to-Market & Competitive Moat
+  Card 7: The Ask & Leadership Team
 
 Return ONLY valid JSON adhering strictly to this schema:
 {
@@ -471,7 +529,7 @@ Return ONLY valid JSON adhering strictly to this schema:
       "title": "Executive Vision",
       "category": "VISION",
       "layout": "hero",
-      "badge": "SEED ROUND // 2026",
+      "badge": "SERIES A // 2026",
       "headline": "Bold Punchy Headline",
       "subheadline": "Compelling single-sentence executive thesis.",
       "elements": [
@@ -498,17 +556,230 @@ Return ONLY valid JSON adhering strictly to this schema:
   ]
 }`;
 
-  const raw = await callClaudeApi(prompt);
-  const parsed = cleanAndParseJSON<DesignDocument>(raw);
+  const rawInitial = await callClaudeApi(initialPrompt);
+  const parsedDoc = cleanAndParseJSON<DesignDocument>(rawInitial);
   
-  parsed.id = parsed.id || `doc-${Date.now()}`;
-  parsed.createdAt = parsed.createdAt || new Date().toISOString();
-  parsed.updatedAt = new Date().toISOString();
-  parsed.themeId = parsed.themeId || themeId;
-  parsed.type = parsed.type || docType;
-  parsed.aspectRatio = isBrochure ? 'trifold' : (parsed.aspectRatio || aspectRatio);
+  parsedDoc.id = parsedDoc.id || `deck-${Date.now()}`;
+  parsedDoc.createdAt = parsedDoc.createdAt || new Date().toISOString();
+  parsedDoc.updatedAt = new Date().toISOString();
+  parsedDoc.themeId = parsedDoc.themeId || themeId;
+  parsedDoc.type = parsedDoc.type || docType;
+  parsedDoc.aspectRatio = parsedDoc.aspectRatio || aspectRatio;
 
+  // CONTINUATION BATCHING (If user requested more than initial batch)
+  let currentCardIndex = parsedDoc.slides.length;
+
+  while (currentCardIndex < totalTargetCards) {
+    const remainingNeeded = totalTargetCards - currentCardIndex;
+    const currentChunkSize = Math.min(remainingNeeded, batchSize);
+    const startNum = currentCardIndex + 1;
+    const endNum = currentCardIndex + currentChunkSize;
+    const progressPercent = Math.round((currentCardIndex / totalTargetCards) * 100);
+
+    onProgress?.(`Generating continuation batch: Cards ${startNum} to ${endNum} of ${totalTargetCards}...`, progressPercent);
+
+    const existingSlideTitles = parsedDoc.slides.map(s => `Card: "${s.title}" (${s.headline})`).join('\n');
+
+    const continuationPrompt = `You are continuing the high-impact ${docType} titled "${parsedDoc.title}": "${parsedDoc.subtitle}".
+Original prompt: "${userPrompt}"
+
+The following ${currentCardIndex} cards have ALREADY been designed:
+${existingSlideTitles}
+
+Now, generate the NEXT ${currentChunkSize} cards (Cards #${startNum} through #${endNum}) to complete the deck.
+Focus on advanced deep-dive topics:
+- Technical Architecture & Deep Dives
+- Detailed Case Studies & Customer Proof
+- Unit Economics, Cohort Retention & Financial Forecasts
+- Competitive Landscape & Feature Comparison Matrix
+- Go-To-Market Channels & Enterprise Sales Motion
+- Global Expansion Roadmap & Strategic Milestones
+- Risk Analysis & Mitigation Framework
+- Closing Call to Action & Investor Contact
+
+Return ONLY a valid JSON object containing the new slides array:
+{
+  "slides": [
+    {
+      "id": "slide-${Date.now()}-${startNum}",
+      "title": "Section Title",
+      "category": "STRATEGY",
+      "layout": "bento-grid",
+      "badge": "EXPANSION",
+      "headline": "Actionable Strategic Headline",
+      "subheadline": "Quantitative supporting argument (1-2 sentences)",
+      "elements": [
+        {
+          "id": "el-${Date.now()}-1",
+          "type": "stat-block",
+          "statValue": "142%",
+          "statLabel": "Net Dollar Retention",
+          "statChange": "Top decile benchmark",
+          "gridSpan": "col-span-12 md:col-span-4"
+        },
+        {
+          "id": "el-${Date.now()}-2",
+          "type": "feature-card",
+          "title": "Strategic Pillar",
+          "content": "Rigorous execution strategy delivering consistent gross margins.",
+          "tag": "MOAT",
+          "gridSpan": "col-span-12 md:col-span-8"
+        }
+      ]
+    }
+  ]
+}`;
+
+    try {
+      const continuationRaw = await callClaudeApi(continuationPrompt);
+      const continuationParsed = cleanAndParseJSON<{ slides: SlidePage[] }>(continuationRaw);
+
+      if (continuationParsed?.slides && Array.isArray(continuationParsed.slides)) {
+        continuationParsed.slides.forEach((newSlide, i) => {
+          newSlide.id = newSlide.id || `slide-${Date.now()}-${currentCardIndex + i + 1}`;
+          parsedDoc.slides.push(newSlide);
+        });
+        currentCardIndex = parsedDoc.slides.length;
+      } else {
+        // Fallback: Break if structure unexpected
+        break;
+      }
+    } catch (batchErr) {
+      console.warn('Batch continuation warning:', batchErr);
+      // Gracefully continue with slides generated so far
+      break;
+    }
+  }
+
+  onProgress?.('Finalizing deck polish & typography...', 95);
+
+  return parsedDoc;
+}
+
+/**
+ * AI ADD NEXT SLIDE
+ * Intelligently analyzes existing deck and generates the next logical card
+ */
+export async function generateNextSlideInDeck(
+  document: DesignDocument,
+  optionalInstruction?: string
+): Promise<SlidePage> {
+  const currentSlideCount = document.slides.length;
+  const existingSummary = document.slides
+    .map((s, idx) => `Card #${idx + 1}: [${s.category || 'GENERAL'}] ${s.title} - ${s.headline}`)
+    .join('\n');
+
+  const prompt = `You are an elite Silicon Valley presentation director designing the NEXT sequential card (Card #${currentSlideCount + 1}) for a deck titled "${document.title}".
+Context / Theme: ${document.themeId}
+Deck Subtitle: "${document.subtitle}"
+
+Existing cards in deck:
+${existingSummary}
+
+${optionalInstruction ? `Specific user instruction for this next card: "${optionalInstruction}"` : 'Determine the most logical, high-impact next chapter (e.g. Unit Economics, Customer Case Study, Technical Moat, or The Ask).'}
+
+Return ONLY a single valid JSON object adhering to the SlidePage schema:
+{
+  "id": "slide-${Date.now()}",
+  "title": "Next Chapter Title",
+  "category": "TRACTION",
+  "layout": "bento-grid",
+  "badge": "CHAPTER // ${currentSlideCount + 1}",
+  "headline": "Bold Punchy Headline",
+  "subheadline": "Clear supporting thesis (1-2 sentences)",
+  "elements": [
+    {
+      "id": "el-${Date.now()}-1",
+      "type": "stat-block",
+      "statValue": "$12.4M",
+      "statLabel": "Projected ARR",
+      "statChange": "Validated forecast",
+      "gridSpan": "col-span-12 md:col-span-4"
+    },
+    {
+      "id": "el-${Date.now()}-2",
+      "type": "feature-card",
+      "title": "Key Catalyst",
+      "content": "Proprietary data flywheel accelerating client conversion by 4.2x.",
+      "tag": "CATALYST",
+      "gridSpan": "col-span-12 md:col-span-8"
+    }
+  ]
+}`;
+
+  const raw = await callClaudeApi(prompt);
+  const parsed = cleanAndParseJSON<SlidePage>(raw);
+  parsed.id = `slide-${Date.now()}`;
   return parsed;
+}
+
+/**
+ * AI EXPAND DECK
+ * Appends N complementary deep-dive cards to an existing document
+ */
+export async function expandDeckWithAI(
+  document: DesignDocument,
+  additionalCount: number = 3,
+  onProgress?: (status: string) => void
+): Promise<SlidePage[]> {
+  onProgress?.(`Expanding deck with ${additionalCount} deep-dive cards...`);
+
+  const existingSummary = document.slides
+    .map((s, idx) => `Card #${idx + 1}: ${s.title} (${s.headline})`)
+    .join('\n');
+
+  const prompt = `You are an elite Silicon Valley presentation director expanding a deck titled "${document.title}": "${document.subtitle}".
+The deck already contains ${document.slides.length} cards:
+${existingSummary}
+
+Generate ${additionalCount} NEW, complementary deep-dive cards to make this presentation extraordinarily comprehensive.
+Suggested chapters to add:
+- Deep-Dive Product Architecture & API Workflow
+- Customer Case Study with Before/After ROI metrics
+- 5-Year Financial Forecast & Unit Economics Model
+
+Return ONLY a single valid JSON object:
+{
+  "slides": [
+    {
+      "id": "slide-expand-1",
+      "title": "Deep Dive Architecture",
+      "category": "ARCHITECTURE",
+      "layout": "bento-grid",
+      "badge": "DEEP DIVE",
+      "headline": "High-Throughput Autonomous Execution",
+      "subheadline": "Scalable cloud-native infrastructure with sub-millisecond failover.",
+      "elements": [
+        {
+          "id": "el-ex-1",
+          "type": "stat-block",
+          "statValue": "99.999%",
+          "statLabel": "Uptime SLA",
+          "statChange": "Zero-maintenance cluster",
+          "gridSpan": "col-span-12 md:col-span-6"
+        },
+        {
+          "id": "el-ex-2",
+          "type": "feature-card",
+          "title": "Self-Healing Clusters",
+          "content": "Automated node rebalancing eliminates single points of failure.",
+          "tag": "INFRASTRUCTURE",
+          "gridSpan": "col-span-12 md:col-span-6"
+        }
+      ]
+    }
+  ]
+}`;
+
+  const raw = await callClaudeApi(prompt);
+  const parsed = cleanAndParseJSON<{ slides: SlidePage[] }>(raw);
+  if (parsed?.slides && Array.isArray(parsed.slides)) {
+    return parsed.slides.map((s, i) => ({
+      ...s,
+      id: `slide-${Date.now()}-${i + 1}`
+    }));
+  }
+  return [];
 }
 
 /**

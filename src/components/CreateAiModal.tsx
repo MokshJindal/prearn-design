@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   X, 
   Sparkles, 
@@ -8,8 +8,11 @@ import {
   Bot, 
   Crown,
   AlertCircle,
-  ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  Infinity,
+  Plus,
+  Minus,
+  Sliders
 } from 'lucide-react';
 import { DocumentType, AspectRatio } from '../types/design';
 import { THEMES } from '../services/themes';
@@ -35,11 +38,13 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
 }) => {
   const [docType, setDocType] = useState<DocumentType>('pitch-deck');
   const [prompt, setPrompt] = useState('');
-  const [cardCount, setCardCount] = useState<number>(5);
+  const [cardCount, setCardCount] = useState<number>(8);
+  const [isCustomCount, setIsCustomCount] = useState<boolean>(false);
   const [themeId, setThemeId] = useState<string>('gamma-cosmic');
   const [selectedModel, setSelectedModel] = useState<string>(getStoredModel());
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusText, setStatusText] = useState('');
+  const [progressPercent, setProgressPercent] = useState<number>(0);
   const [errorText, setErrorText] = useState<string | null>(null);
 
   const hasApiKey = Boolean(getStoredApiKey());
@@ -52,10 +57,10 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
   };
 
   const promptSuggestions = [
-    'Autonomous AI supply chain platform raising $4M Seed round with multi-agent orchestration, $85B TAM, and $1.8M ARR traction.',
-    'Luxury enterprise cybersecurity brochure for Zero-Trust cloud workloads with hardware root of trust and SOC-2 compliance.',
-    'B2B SaaS treasury management platform offering 5.2% yield on cash balances with multi-bank FDIC insurance.',
-    'Frontier AI robotics developer conference flyer in San Francisco with 2,500 attendees and $1M venture pitch contest.',
+    'Autonomous enterprise AI agent orchestrator raising $6M Series A: $90B TAM, $2.4M ARR, 160% NRR, Fortune 500 pilots, and ex-DeepMind team.',
+    'Ultra-luxury corporate wealth management brochure detailing family office advisory, private equity allocations, global tax alpha, and Zurich/Mayfair offices.',
+    'Decentralized GPU compute network pitch deck showing 80% cost savings vs AWS, proof of physical work, tokenomics, and 12,000 active nodes.',
+    'AI Healthcare diagnostics platform detecting cardiac anomalies 3 years before clinical onset, FDA breakthrough status, and Johns Hopkins clinical trials.',
   ];
 
   const handleGenerate = async () => {
@@ -64,35 +69,26 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
     try {
       setIsGenerating(true);
       setErrorText(null);
+      setProgressPercent(10);
       const activeModelObj = AVAILABLE_MODELS.find(m => m.id === selectedModel);
-      setStatusText(`Contacting ${activeModelObj?.name?.split('(')[0] || 'Claude'}...`);
+      setStatusText(`Initializing ${activeModelObj?.name?.split('(')[0] || 'Claude AI'}...`);
 
-      // Dynamic step timer for great user feedback
-      const timer1 = setTimeout(() => {
-        setStatusText('Structuring executive narrative & market opportunity...');
-      }, 2500);
-
-      const timer2 = setTimeout(() => {
-        setStatusText('Synthesizing Bento cards, metrics & visual tokens...');
-      }, 7000);
-
-      const timer3 = setTimeout(() => {
-        setStatusText('Applying Gamma ambient theme & layouts...');
-      }, 12000);
-
+      const targetSlides = docType === 'brochure' ? cardCount : cardCount;
       const aspectRatio: AspectRatio = docType === 'pitch-deck' ? '16:9' : docType === 'brochure' ? 'trifold' : 'a4-portrait';
+
       const newDoc = await generateFullDesignDocument(
         prompt,
         docType,
         themeId,
         aspectRatio,
-        docType === 'brochure' ? 3 : cardCount
+        targetSlides,
+        (status, percent) => {
+          setStatusText(status);
+          if (percent !== undefined) setProgressPercent(percent);
+        }
       );
 
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-      clearTimeout(timer3);
-
+      setProgressPercent(100);
       setStatusText('Complete! Opening canvas...');
       onCreated(newDoc);
       onClose();
@@ -102,6 +98,10 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleAdjustCardCount = (delta: number) => {
+    setCardCount(prev => Math.max(1, Math.min(prev + delta, 60)));
   };
 
   return (
@@ -116,8 +116,9 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-white">Create with Claude AI</h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/20 text-purple-300 font-semibold border border-purple-500/30">
-                  GAMMA STUDIO
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/20 text-purple-300 font-semibold border border-purple-500/30 flex items-center gap-1">
+                  <Infinity className="w-3 h-3 text-purple-400" />
+                  <span>LIMITLESS SUITE</span>
                 </span>
                 {hasApiKey && (
                   <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
@@ -127,7 +128,7 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
                 )}
               </div>
               <p className="text-xs text-neutral-400">
-                Generate high-impact pitch decks, luxury brochures, or one-pagers powered by Anthropic.
+                Architect presentations, luxury brochures, or whitepapers with no arbitrary slide limits.
               </p>
             </div>
           </div>
@@ -155,12 +156,17 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
             </div>
           )}
 
-          {/* 1. MODEL SELECTOR (Opus, Sonnet, Fable, Haiku) */}
+          {/* 1. MODEL SELECTOR */}
           <div>
-            <label className="text-xs font-semibold text-neutral-300 block mb-2 uppercase tracking-wider font-mono flex items-center gap-1.5">
-              <Bot className="w-3.5 h-3.5 text-purple-400" />
-              <span>1. Choose Claude AI Engine</span>
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold text-neutral-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                <Bot className="w-3.5 h-3.5 text-purple-400" />
+                <span>1. Choose Claude AI Engine</span>
+              </label>
+              <span className="text-[10px] font-mono text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
+                8192 Token Buffer
+              </span>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {AVAILABLE_MODELS.slice(0, 3).map((m) => (
                 <button
@@ -181,7 +187,7 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
                     </span>
                     {selectedModel === m.id && <Check className="w-3.5 h-3.5 text-purple-400" />}
                   </div>
-                  <div className="text-[11px] text-neutral-300 font-medium">{m.name.split('(')[0]}</div>
+                  <div className="text-[11px] text-neutral-300 font-medium truncate">{m.name.split('(')[0]}</div>
                   <div className="text-[10px] text-neutral-400 mt-1 line-clamp-2 leading-tight">
                     {m.description}
                   </div>
@@ -193,7 +199,7 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
           {/* 2. Deliverable Format */}
           <div>
             <label className="text-xs font-semibold text-neutral-300 block mb-2 uppercase tracking-wider font-mono">
-              2. What would you like to create?
+              2. Deliverable Format
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {[
@@ -204,7 +210,14 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
               ].map((item) => (
                 <button
                   key={item.type}
-                  onClick={() => setDocType(item.type)}
+                  onClick={() => {
+                    setDocType(item.type);
+                    if (item.type === 'brochure') {
+                      setCardCount(3);
+                    } else if (cardCount < 5) {
+                      setCardCount(8);
+                    }
+                  }}
                   className={`p-3 rounded-2xl border text-left transition-all ${
                     docType === item.type
                       ? 'bg-purple-600/20 border-purple-500 text-white shadow-sm ring-1 ring-purple-500'
@@ -223,9 +236,9 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-semibold text-neutral-300 uppercase tracking-wider font-mono">
-                3. Describe what you want to create
+                3. Describe Your Vision
               </label>
-              <span className="text-[11px] text-neutral-500">Be as specific or brief as you like</span>
+              <span className="text-[11px] text-neutral-500">Provide prompt or paste outline</span>
             </div>
             <textarea
               value={prompt}
@@ -233,7 +246,7 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
               placeholder={
                 docType === 'brochure'
                   ? 'e.g., A luxury corporate brochure for an elite AI venture studio, covering our philosophy, 3 core innovation pillars, enterprise case studies, and London/SF contact details...'
-                  : 'e.g., A pitch deck for an autonomous enterprise AI platform raising $4M Seed round, highlighting friction points, multi-agent architecture, $1.8M ARR traction, and team...'
+                  : 'e.g., A comprehensive pitch deck for an autonomous enterprise AI platform raising $4M Seed round, highlighting friction points, multi-agent architecture, $1.8M ARR traction, competitor matrix, and team...'
               }
               rows={4}
               className="w-full bg-[#0E0F17] border border-white/10 rounded-2xl p-4 text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-purple-500 transition-colors resize-none font-sans"
@@ -258,37 +271,108 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
             </div>
           </div>
 
-          {/* 4. Theme & Cards Count */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-white/5">
-            {/* Card Count */}
+          {/* 4. Limitless Slide / Panel Count & Theme */}
+          <div className="pt-3 border-t border-white/10 space-y-4">
+            {/* Card Count Selector */}
             <div>
-              <label className="text-xs font-semibold text-neutral-300 block mb-2 uppercase tracking-wider font-mono">
-                4. {docType === 'brochure' ? 'Brochure Panels' : 'Card Count'}: <span className="text-purple-400 font-bold">{docType === 'brochure' ? '3 Panels' : `${cardCount} Cards`}</span>
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold text-neutral-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                  <Infinity className="w-3.5 h-3.5 text-purple-400" />
+                  <span>4. {docType === 'brochure' ? 'Brochure Panels' : 'Deck Slide Count'}:</span>
+                  <span className="text-purple-400 font-bold font-mono">
+                    {cardCount} {docType === 'brochure' ? 'Panels' : 'Cards'}
+                  </span>
+                </label>
+                <button
+                  onClick={() => setIsCustomCount(!isCustomCount)}
+                  className="text-[11px] text-purple-300 hover:text-purple-200 underline font-mono flex items-center gap-1"
+                >
+                  <Sliders className="w-3 h-3" />
+                  <span>{isCustomCount ? 'Use Presets' : 'Custom Number'}</span>
+                </button>
+              </div>
+
               {docType === 'brochure' ? (
-                <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-300 text-xs font-medium flex items-center gap-2">
-                  <span>📖</span>
-                  <span>Tri-Fold Panoramic Spread (Cover, Inside, Back)</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
+                /* Brochure Panel Options */
+                <div className="grid grid-cols-4 gap-2">
                   {[
-                    { cnt: 4, desc: 'Teaser' },
-                    { cnt: 5, desc: 'Recommended' },
-                    { cnt: 6, desc: 'Standard' },
-                    { cnt: 7, desc: 'In-Depth' }
-                  ].map(({ cnt, desc }) => (
+                    { cnt: 3, label: '3-Panel', desc: 'Tri-Fold Spread' },
+                    { cnt: 4, label: '4-Panel', desc: 'Gate Fold' },
+                    { cnt: 6, label: '6-Panel', desc: 'Corporate Spread' },
+                    { cnt: 8, label: '8-Panel', desc: 'Magazine Booklet' },
+                  ].map(({ cnt, label, desc }) => (
                     <button
                       key={cnt}
                       onClick={() => setCardCount(cnt)}
-                      className={`flex-1 py-1.5 px-2 rounded-xl border text-xs font-mono font-semibold transition-all flex flex-col items-center ${
+                      className={`p-2.5 rounded-2xl border text-center transition-all ${
                         cardCount === cnt
                           ? 'bg-purple-600 text-white border-purple-500 shadow-sm'
                           : 'bg-white/[0.02] border-white/10 text-neutral-400 hover:text-white'
                       }`}
                     >
-                      <span>{cnt}</span>
-                      <span className="text-[9px] opacity-70 font-sans">{desc}</span>
+                      <div className="font-bold text-xs">{label}</div>
+                      <div className="text-[9px] opacity-70 mt-0.5">{desc}</div>
+                    </button>
+                  ))}
+                </div>
+              ) : isCustomCount ? (
+                /* Custom Unlimited Number Stepper */
+                <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>Limitless Slide Generator</span>
+                      <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                        Zero Cap
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-neutral-400 mt-0.5">
+                      Decks with &gt;8 slides are automatically multi-batch processed without token clipping.
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleAdjustCardCount(-1)}
+                      className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <input
+                      type="number"
+                      min={1}
+                      max={60}
+                      value={cardCount}
+                      onChange={(e) => setCardCount(Math.max(1, Math.min(parseInt(e.target.value) || 1, 60)))}
+                      className="w-16 text-center py-1.5 rounded-xl bg-black/50 border border-purple-500/50 text-white font-mono font-bold text-sm focus:outline-none"
+                    />
+                    <button
+                      onClick={() => handleAdjustCardCount(1)}
+                      className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Standard Limitless Presets */
+                <div className="grid grid-cols-5 gap-2">
+                  {[
+                    { cnt: 5, label: '5 Cards', desc: 'Pitch Teaser' },
+                    { cnt: 8, label: '8 Cards', desc: 'Standard Deck' },
+                    { cnt: 12, label: '12 Cards', desc: 'Full Narrative' },
+                    { cnt: 16, label: '16 Cards', desc: 'Deep Dive' },
+                    { cnt: 20, label: '20+ Cards', desc: 'Master Deck' },
+                  ].map(({ cnt, label, desc }) => (
+                    <button
+                      key={cnt}
+                      onClick={() => setCardCount(cnt)}
+                      className={`p-2 rounded-2xl border text-center transition-all ${
+                        cardCount === cnt
+                          ? 'bg-purple-600 text-white border-purple-500 shadow-sm'
+                          : 'bg-white/[0.02] border-white/10 text-neutral-400 hover:text-white'
+                      }`}
+                    >
+                      <div className="font-bold text-xs">{label}</div>
+                      <div className="text-[9px] opacity-70 mt-0.5">{desc}</div>
                     </button>
                   ))}
                 </div>
@@ -300,7 +384,7 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
               <label className="text-xs font-semibold text-neutral-300 block mb-2 uppercase tracking-wider font-mono">
                 5. Visual Theme
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {THEMES.slice(0, 4).map((t) => (
                   <button
                     key={t.id}
@@ -327,14 +411,21 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
 
           {/* Progress / Status indicator */}
           {isGenerating && (
-            <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center gap-3 animate-pulse">
-              <RefreshCw className="w-5 h-5 text-purple-400 animate-spin" />
-              <div>
-                <div className="text-xs font-bold text-white flex items-center gap-2">
-                  <span>Generating with {selectedModel}...</span>
-                  <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping" />
+            <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/30 space-y-2 animate-fadeIn">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 text-purple-400 animate-spin" />
+                  <span className="text-xs font-bold text-white">{statusText}</span>
                 </div>
-                <div className="text-[11px] text-purple-300 mt-0.5">{statusText}</div>
+                {progressPercent > 0 && (
+                  <span className="text-xs font-mono font-bold text-purple-300">{progressPercent}%</span>
+                )}
+              </div>
+              <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-300 rounded-full"
+                  style={{ width: `${Math.max(progressPercent, 12)}%` }}
+                />
               </div>
             </div>
           )}
@@ -356,12 +447,12 @@ export const CreateAiModal: React.FC<CreateAiModalProps> = ({
             {isGenerating ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Generating...</span>
+                <span>Generating {cardCount} Cards...</span>
               </>
             ) : (
               <>
                 <Wand2 className="w-4 h-4" />
-                <span>Generate with Claude</span>
+                <span>Generate {cardCount} {docType === 'brochure' ? 'Panels' : 'Cards'}</span>
               </>
             )}
           </button>

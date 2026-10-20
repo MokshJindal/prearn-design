@@ -60,7 +60,19 @@ export const storageService = {
         all.unshift(updatedDoc);
       }
 
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+      } catch (quotaErr) {
+        // Quota exceeded fallback: preserve current and top recent projects
+        console.warn('LocalStorage quota limit reached, compacting stored decks...');
+        const compacted = all.slice(0, 8);
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(compacted));
+        } catch (e) {
+          // If still over quota, store only current document
+          localStorage.setItem(STORAGE_KEY, JSON.stringify([updatedDoc]));
+        }
+      }
     } catch (err) {
       console.error('Failed to save project:', err);
     }
